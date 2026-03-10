@@ -99,6 +99,70 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
       - `src/tests/auth.test.ts` - 3 个测试用例
 ```
 
+## 飞书群聊场景
+
+接入 OpenClaw 后，不同角色可在飞书群聊中使用：
+
+### 开发工程师
+
+```
+@OpenClaw 登录功能在哪？
+@OpenClaw 修改 handleLogin 会影响哪些地方？
+@OpenClaw 调用链：从 main 到 UserService
+```
+
+快速定位代码、了解实现细节、评估修改影响。
+
+### 测试工程师
+
+```
+@OpenClaw 登录模块有哪些测试用例？
+@OpenClaw 测试覆盖率怎么样？
+@OpenClaw 这个接口的边界条件是什么？
+```
+
+了解测试覆盖、查找测试用例、分析边界条件。
+
+### 产品经理
+
+```
+@OpenClaw 这个项目有多少个模块？
+@OpenClaw 支付功能实现了吗？
+@OpenClaw 项目的技术栈是什么？
+```
+
+了解项目进度、功能实现情况、技术选型。
+
+### 运维工程师
+
+```
+@OpenClaw 项目的 CI/CD 配置在哪？
+@OpenClaw 需要哪些环境变量？
+@OpenClaw 如何构建和部署？
+```
+
+了解部署配置、环境依赖、构建流程。
+
+### 新人入职
+
+```
+@OpenClaw 帮我初始化这个项目
+@OpenClaw 项目的架构是什么？
+@OpenClaw 从哪里开始看代码？
+```
+
+快速上手项目，减少导师负担。
+
+### 技术 Leader
+
+```
+@OpenClaw 这个模块的复杂度如何？
+@OpenClaw 有哪些技术债务（TODO）？
+@OpenClaw IPC 通信架构是怎样的？
+```
+
+架构评审、技术债务追踪、代码审查准备。
+
 ## 架构亮点
 
 ### 分层文档结构

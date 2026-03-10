@@ -245,9 +245,6 @@ python3 ~/.claude/tools/init/utils/doc_generator.py structure "$PROJECT_DIR"
 ```
 
 ## 大型项目处理策略
-| adas_core | adas | `adas/core/main.cpp` | Socket |
-
-## 大型项目处理策略
 
 ### 自动检测项目规模
 

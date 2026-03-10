@@ -14,6 +14,19 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
+# 导入统一常量
+try:
+    from constants import EXCLUDE_DIRS
+except ImportError:
+    EXCLUDE_DIRS = {
+        '.git', '.svn', '.hg', '.idea', '.vscode',
+        'node_modules', 'dist', 'build', 'out', 'bin', 'obj',
+        '__pycache__', '.pytest_cache', '.mypy_cache',
+        'target', 'vendor', 'CMakeFiles', '_deps',
+        '.gradle', 'Pods', 'DerivedData',
+        'venv', '.venv', 'env', '.env',
+    }
+
 
 # 保留关键字，排除这些不作为函数名
 KEYWORDS = {
@@ -141,16 +154,6 @@ class CallChainAnalyzer:
         '.rs': 'rust',
     }
 
-    # 排除目录
-    EXCLUDE_DIRS = {
-        '.git', '.svn', '.hg', '.idea', '.vscode',
-        'node_modules', 'dist', 'build', 'out', 'bin', 'obj',
-        '__pycache__', '.pytest_cache', '.mypy_cache',
-        'target', 'vendor', 'CMakeFiles', '_deps',
-        '.gradle', 'Pods', 'DerivedData',
-        'venv', '.venv', 'env', '.env',
-    }
-
     def __init__(self, project_dir: str, max_workers: int = 4):
         self.project_dir = os.path.abspath(project_dir)
         self.max_workers = max_workers
@@ -216,7 +219,7 @@ class CallChainAnalyzer:
 
         for root, dirs, files in os.walk(self.project_dir):
             # 排除特定目录
-            dirs[:] = [d for d in dirs if d not in self.EXCLUDE_DIRS]
+            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
 
             for f in files:
                 ext = os.path.splitext(f)[1].lower()

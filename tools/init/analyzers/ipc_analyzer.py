@@ -16,8 +16,16 @@ import os
 import re
 import json
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional, Set, Tuple
 from dataclasses import dataclass, field
+
+# 添加日志支持
+try:
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -85,25 +93,149 @@ class IPCAnalyzer:
         self.communication_matrix: List[Dict[str, Any]] = []
 
     def analyze(self) -> Dict[str, Any]:
-        """执行分析"""
-        self._scan_aidl_files()
-        self._scan_dbus_files()
-        self._scan_proto_files()
-        self._scan_someip_files()
-        self._scan_socket_usage()
+        """执行分析（优化版：单次遍历）"""
+        logger.info(f"开始 IPC 分析: {self.project_dir}")
+
+        # 单次遍历收集所有相关文件
+        self._scan_all_files()
+
         self._build_communication_matrix()
-        self._detect_processes()
 
-        return self._generate_report()
+        result = self._generate_report()
+        logger.info(f"IPC 分析完成: {len(self.interfaces)} 接口, {len(self.processes)} 进程")
+        return result
 
-    def _scan_aidl_files(self) -> None:
-        """扫描 AIDL 文件"""
-        for aidl_file in self.project_dir.rglob('*.aidl'):
-            try:
-                content = aidl_file.read_text(encoding='utf-8', errors='ignore')
-                self._parse_aidl(content, str(aidl_file.relative_to(self.project_dir)))
-            except Exception:
-                pass
+    def _scan_all_files(self) -> None:
+        """单次遍历扫描所有相关文件（优化性能）"""
+        # 文件扩展名到处理函数的映射
+        extension_handlers = {
+            '.aidl': self._handle_aidl_file,
+            '.proto': self._handle_proto_file,
+            '.xml': self._handle_xml_file,
+            '.json': self._handle_json_file,
+            '.cpp': self._handle_source_file,
+            '.c': self._handle_source_file,
+            '.java': self._handle_source_file,
+            '.kt': self._handle_source_file,
+            '.py': self._handle_source_file,
+        }
+
+        # 排除目录
+        exclude_dirs = {
+            '.git', '.svn', '.hg', '.idea', '.vscode',
+            'node_modules', 'build', 'dist', 'out', 'bin', 'obj',
+            '__pycache__', '.pytest_cache', '.mypy_cache',
+            'target', 'vendor', 'CMakeFiles', '_deps',
+            '.gradle', 'Pods', 'DerivedData',
+        }
+
+        # 单次遍历
+        for root, dirs, files in os.walk(self.project_dir):
+            # 排除特定目录
+            dirs[:] = [d for d in dirs if d not in exclude_dirs]
+
+            for f in files:
+                ext = Path(f).suffix.lower()
+                handler = extension_handlers.get(ext)
+                if handler:
+                    file_path = Path(root) / f
+                    try:
+                        handler(file_path)
+                    except Exception as e:
+                        logger.debug(f"处理文件失败 {file_path}: {e}")
+
+    def _handle_aidl_file(self, file_path: Path) -> None:
+        """处理 AIDL 文件"""
+        content = file_path.read_text(encoding='utf-8', errors='ignore')
+        self._parse_aidl(content, str(file_path.relative_to(self.project_dir)))
+
+    def _handle_proto_file(self, file_path: Path) -> None:
+        """处理 Protobuf 文件"""
+        content = file_path.read_text(encoding='utf-8', errors='ignore')
+        self._parse_proto(content, str(file_path.relative_to(self.project_dir)))
+
+    def _handle_xml_file(self, file_path: Path) -> None:
+        """处理 XML 文件（DBus introspection）"""
+        # 只处理 DBus introspection 文件
+        if 'dbus' not in file_path.name.lower():
+            return
+        content = file_path.read_text(encoding='utf-8', errors='ignore')
+        self._parse_dbus(content, str(file_path.relative_to(self.project_dir)))
+
+    def _handle_json_file(self, file_path: Path) -> None:
+        """处理 JSON 文件（SOME/IP 配置）"""
+        if 'someip' not in file_path.name.lower():
+            return
+        content = file_path.read_text(encoding='utf-8', errors='ignore')
+        try:
+            data = json.loads(content)
+            self._parse_someip_config(data, str(file_path.relative_to(self.project_dir)))
+        except json.JSONDecodeError:
+            pass
+
+    def _handle_source_file(self, file_path: Path) -> None:
+        """处理源代码文件（Socket 使用和进程检测）"""
+        ext = file_path.suffix.lower()
+        rel_path = str(file_path.relative_to(self.project_dir))
+
+        try:
+            content = file_path.read_text(encoding='utf-8', errors='ignore')
+
+            # 检测 Socket 使用
+            self._detect_socket_usage_in_file(content, rel_path, ext)
+
+            # 检测进程（main 函数）
+            self._detect_process_in_file(content, rel_path, ext)
+        except Exception:
+            pass
+
+    def _detect_socket_usage_in_file(self, content: str, file_path: str, ext: str) -> None:
+        """在文件中检测 Socket 使用"""
+        socket_patterns = [
+            (r'unix\s*socket.*?(\S+\.sock)', 'unix_socket'),
+            (r'connect\s*\([^,]+,\s*"([^"]+)"', 'tcp_socket'),
+            (r'bind\s*\([^,]+,\s*"([^"]+)"', 'tcp_socket'),
+        ]
+
+        for pattern, socket_type in socket_patterns:
+            for match in re.finditer(pattern, content, re.IGNORECASE):
+                socket_path = match.group(1)
+                interface_name = Path(socket_path).stem
+                key = f"socket:{interface_name}"
+                if key not in self.interfaces:
+                    self.interfaces[key] = IPCInterface(
+                        name=interface_name,
+                        protocol=socket_type,
+                        file=file_path,
+                        methods=['connect', 'send', 'receive'],
+                    )
+
+    def _detect_process_in_file(self, content: str, file_path: str, ext: str) -> None:
+        """在文件中检测进程入口"""
+        main_patterns = {
+            '.cpp': r'int\s+main\s*\(',
+            '.c': r'int\s+main\s*\(',
+            '.py': r'def\s+main\s*\(',
+            '.java': r'public\s+static\s+void\s+main\s*\(',
+            '.kt': r'fun\s+main\s*\(',
+        }
+
+        pattern = main_patterns.get(ext)
+        if pattern and re.search(pattern, content):
+            process_name = Path(file_path).parent.name
+            if process_name not in self.processes:
+                self.processes[process_name] = ProcessInfo(
+                    name=process_name,
+                    entry_file=file_path,
+                    subsystem=self._infer_subsystem_from_path(file_path),
+                )
+
+    def _infer_subsystem_from_path(self, file_path: str) -> str:
+        """从文件路径推断所属子系统"""
+        parts = Path(file_path).parts
+        if len(parts) > 1:
+            return parts[0]
+        return "main"
 
     def _parse_aidl(self, content: str, file_path: str) -> None:
         """解析 AIDL 内容"""
@@ -126,18 +258,6 @@ class IPCAnalyzer:
                 methods=methods,
             )
 
-    def _scan_dbus_files(self) -> None:
-        """扫描 DBus 配置文件"""
-        for dbus_file in self.project_dir.rglob('*.xml'):
-            # 只处理 DBus introspection 文件
-            if 'dbus' not in dbus_file.name.lower():
-                continue
-            try:
-                content = dbus_file.read_text(encoding='utf-8', errors='ignore')
-                self._parse_dbus(content, str(dbus_file.relative_to(self.project_dir)))
-            except Exception:
-                pass
-
     def _parse_dbus(self, content: str, file_path: str) -> None:
         """解析 DBus XML 内容"""
         for match in self.DBUS_INTERFACE_PATTERN.finditer(content):
@@ -155,15 +275,6 @@ class IPCAnalyzer:
                 file=file_path,
                 methods=methods,
             )
-
-    def _scan_proto_files(self) -> None:
-        """扫描 Protobuf 文件"""
-        for proto_file in self.project_dir.rglob('*.proto'):
-            try:
-                content = proto_file.read_text(encoding='utf-8', errors='ignore')
-                self._parse_proto(content, str(proto_file.relative_to(self.project_dir)))
-            except Exception:
-                pass
 
     def _parse_proto(self, content: str, file_path: str) -> None:
         """解析 Protobuf 内容"""
@@ -183,17 +294,6 @@ class IPCAnalyzer:
                 methods=methods,
             )
 
-    def _scan_someip_files(self) -> None:
-        """扫描 SOME/IP 配置文件"""
-        # SOME/IP 通常在 JSON/YAML 配置中定义
-        for config_file in self.project_dir.rglob('*someip*.json'):
-            try:
-                content = config_file.read_text(encoding='utf-8', errors='ignore')
-                data = json.loads(content)
-                self._parse_someip_config(data, str(config_file.relative_to(self.project_dir)))
-            except Exception:
-                pass
-
     def _parse_someip_config(self, data: Dict, file_path: str) -> None:
         """解析 SOME/IP 配置"""
         services = data.get('services', [])
@@ -212,66 +312,6 @@ class IPCAnalyzer:
                 file=file_path,
                 methods=methods,
             )
-
-    def _scan_socket_usage(self) -> None:
-        """扫描 Socket 使用"""
-        # 查找 Unix Domain Socket 和 TCP Socket 使用
-        socket_patterns = [
-            (r'unix\s*socket.*?(\S+\.sock)', 'unix_socket'),
-            (r'connect\s*\([^,]+,\s*"([^"]+)"', 'tcp_socket'),
-            (r'bind\s*\([^,]+,\s*"([^"]+)"', 'tcp_socket'),
-        ]
-
-        for ext in ['.cpp', '.c', '.java', '.kt', '.py']:
-            for source_file in self.project_dir.rglob(f'*{ext}'):
-                try:
-                    content = source_file.read_text(encoding='utf-8', errors='ignore')
-                    for pattern, socket_type in socket_patterns:
-                        for match in re.finditer(pattern, content, re.IGNORECASE):
-                            socket_path = match.group(1)
-                            interface_name = Path(socket_path).stem
-                            key = f"socket:{interface_name}"
-                            if key not in self.interfaces:
-                                self.interfaces[key] = IPCInterface(
-                                    name=interface_name,
-                                    protocol=socket_type,
-                                    file=str(source_file.relative_to(self.project_dir)),
-                                    methods=['connect', 'send', 'receive'],
-                                )
-                except Exception:
-                    pass
-
-    def _detect_processes(self) -> None:
-        """检测进程定义"""
-        # 查找 main 函数作为进程入口
-        main_patterns = [
-            (r'int\s+main\s*\(', '.cpp'),
-            (r'def\s+main\s*\(', '.py'),
-            (r'public\s+static\s+void\s+main\s*\(', '.java'),
-            (r'fun\s+main\s*\(', '.kt'),
-        ]
-
-        for pattern, ext in main_patterns:
-            for source_file in self.project_dir.rglob(f'*{ext}'):
-                try:
-                    content = source_file.read_text(encoding='utf-8', errors='ignore')
-                    if re.search(pattern, content):
-                        process_name = source_file.parent.name
-                        if process_name not in self.processes:
-                            self.processes[process_name] = ProcessInfo(
-                                name=process_name,
-                                entry_file=str(source_file.relative_to(self.project_dir)),
-                                subsystem=self._infer_subsystem(source_file),
-                            )
-                except Exception:
-                    pass
-
-    def _infer_subsystem(self, file_path: Path) -> str:
-        """推断文件所属子系统"""
-        parts = file_path.relative_to(self.project_dir).parts
-        if len(parts) > 1:
-            return parts[0]
-        return "main"
 
     def _build_communication_matrix(self) -> None:
         """构建通信矩阵"""

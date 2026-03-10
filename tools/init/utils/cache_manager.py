@@ -20,6 +20,15 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Set
 from pathlib import Path
 from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# 添加日志支持
+try:
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -137,6 +146,7 @@ class CacheManager:
         if self._cache is not None:
             return self._cache
 
+        logger.debug(f"加载缓存: {self._cache_path}")
         if self._cache_path.exists():
             try:
                 with open(self._cache_path, 'r', encoding='utf-8') as f:
@@ -155,9 +165,12 @@ class CacheManager:
                     processes=data.get('processes', []),
                     ipc_protocols=data.get('ipc_protocols', []),
                 )
-            except Exception:
+                logger.debug(f"缓存加载成功, 版本: {self._cache.version}")
+            except Exception as e:
+                logger.warning(f"缓存加载失败: {e}")
                 self._cache = CacheEntry()
         else:
+            logger.debug("缓存文件不存在，创建新缓存")
             self._cache = CacheEntry()
 
         return self._cache
@@ -256,7 +269,8 @@ class CacheManager:
         return hashes
 
     def get_git_status(self) -> Dict[str, Any]:
-        """获取 Git 状态"""
+        """获取 Git 状态（并行执行多个 git 命令）"""
+        logger.debug(f"获取 Git 状态: {self.project_dir}")
         result = {
             'is_git_repo': False,
             'branch': '',
@@ -270,8 +284,23 @@ class CacheManager:
             'behind': 0,
         }
 
+        def run_git_command(cmd: List[str], timeout: int = 5) -> tuple:
+            """运行单个 git 命令"""
+            try:
+                r = subprocess.run(
+                    cmd,
+                    cwd=self.project_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+                return (cmd[1], r.returncode, r.stdout.strip())
+            except Exception as e:
+                logger.debug(f"Git 命令失败 {' '.join(cmd)}: {e}")
+                return (cmd[1], -1, '')
+
         try:
-            # 检查是否是 Git 仓库
+            # 首先检查是否是 Git 仓库
             r = subprocess.run(
                 ['git', 'rev-parse', '--git-dir'],
                 cwd=self.project_dir,
@@ -284,27 +313,36 @@ class CacheManager:
 
             result['is_git_repo'] = True
 
-            # 获取当前分支
-            r = subprocess.run(
-                ['git', 'branch', '--show-current'],
-                cwd=self.project_dir,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if r.returncode == 0:
-                result['branch'] = r.stdout.strip()
+            # 并行执行其他 git 命令
+            git_commands = [
+                (['git', 'branch', '--show-current'], 5),
+                (['git', 'status', '--porcelain'], 10),
+                (['git', 'log', '-1', '--format=%H|%ci|%s'], 5),
+                (['git', 'rev-list', '--left-right', '--count', '@{upstream}...HEAD'], 5),
+            ]
 
-            # 检查是否有未提交变更
-            r = subprocess.run(
-                ['git', 'status', '--porcelain'],
-                cwd=self.project_dir,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if r.returncode == 0:
-                lines = r.stdout.strip().split('\n') if r.stdout.strip() else []
+            results = {}
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                futures = {
+                    executor.submit(run_git_command, cmd, timeout): name
+                    for cmd, timeout in git_commands
+                    for name in [cmd[1]]
+                }
+                for future in as_completed(futures):
+                    try:
+                        cmd_name, returncode, output = future.result()
+                        results[cmd_name] = (returncode, output)
+                    except Exception as e:
+                        logger.debug(f"Git 并行命令异常: {e}")
+
+            # 处理 branch 结果
+            if 'branch' in results and results['branch'][0] == 0:
+                result['branch'] = results['branch'][1]
+
+            # 处理 status 结果
+            if 'status' in results and results['status'][0] == 0:
+                output = results['status'][1]
+                lines = output.split('\n') if output else []
                 result['has_changes'] = len(lines) > 0
                 for line in lines:
                     if line:
@@ -314,16 +352,9 @@ class CacheManager:
                         if status == '?':
                             result['has_untracked'] = True
 
-            # 获取最近提交
-            r = subprocess.run(
-                ['git', 'log', '-1', '--format=%H|%ci|%s'],
-                cwd=self.project_dir,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if r.returncode == 0 and r.stdout.strip():
-                parts = r.stdout.strip().split('|', 2)
+            # 处理 log 结果
+            if 'log' in results and results['log'][0] == 0 and results['log'][1]:
+                parts = results['log'][1].split('|', 2)
                 if len(parts) >= 1:
                     result['last_commit'] = parts[0][:7]
                 if len(parts) >= 2:
@@ -331,22 +362,15 @@ class CacheManager:
                 if len(parts) >= 3:
                     result['last_commit_message'] = parts[2][:50]
 
-            # 获取 ahead/behind
-            r = subprocess.run(
-                ['git', 'rev-list', '--left-right', '--count', '@{upstream}...HEAD'],
-                cwd=self.project_dir,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if r.returncode == 0 and r.stdout.strip():
-                parts = r.stdout.strip().split()
+            # 处理 rev-list 结果
+            if 'rev-list' in results and results['rev-list'][0] == 0 and results['rev-list'][1]:
+                parts = results['rev-list'][1].split()
                 if len(parts) == 2:
                     result['behind'] = int(parts[0])
                     result['ahead'] = int(parts[1])
 
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"获取 Git 状态异常: {e}")
 
         return result
 

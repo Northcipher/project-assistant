@@ -11,19 +11,25 @@ import json
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
+# 导入统一常量
+try:
+    from constants import EXCLUDE_DIRS
+except ImportError:
+    EXCLUDE_DIRS = {
+        '.git', '.svn', '.hg', '.idea', '.vscode',
+        'node_modules', '__pycache__', 'build', 'dist', 'out',
+        'target', 'vendor', 'CMakeFiles', '_deps',
+        '.gradle', 'Pods', 'DerivedData',
+        'venv', '.venv', 'env', '.env',
+        'Output', 'Listings', 'Objects', 'DebugConfig', 'RTE',
+    }
+
 
 def get_directory_tree(target_dir: str, max_depth: int = 3, exclude_dirs: set = None,
                        max_items: int = 50) -> str:
     """生成目录树（限制输出大小）"""
     if exclude_dirs is None:
-        exclude_dirs = {
-            '.git', '.svn', '.hg', '.idea', '.vscode',
-            'node_modules', '__pycache__', 'build', 'dist', 'out',
-            'target', 'vendor', 'CMakeFiles', '_deps',
-            '.gradle', 'Pods', 'DerivedData',
-            'venv', '.venv', 'env', '.env',
-            'Output', 'Listings', 'Objects', 'DebugConfig', 'RTE',
-        }
+        exclude_dirs = EXCLUDE_DIRS
 
     lines = []
     item_count = 0

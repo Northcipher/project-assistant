@@ -26,7 +26,7 @@ class BaseAnalyzer(ABC):
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 return f.read()
-        except:
+        except (IOError, OSError):
             return None
 
     def find_files(self, extensions: List[str], exclude_dirs: set = None) -> List[str]:
@@ -49,7 +49,7 @@ class BaseAnalyzer(ABC):
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 return len(f.readlines())
-        except:
+        except (IOError, OSError):
             return 0
 
     def grep_pattern(self, pattern: str, file_path: str) -> List[str]:

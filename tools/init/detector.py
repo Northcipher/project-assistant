@@ -21,6 +21,28 @@ from typing import Dict, List, Optional, Any, Tuple, Set
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
+# 添加日志支持
+try:
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+
+# 导入统一常量
+try:
+    from constants import EXCLUDE_DIRS
+except ImportError:
+    EXCLUDE_DIRS = {
+        '.git', '.svn', '.hg', '.idea', '.vscode',
+        'node_modules', 'dist', 'build', 'out', 'bin', 'obj',
+        '__pycache__', '.pytest_cache', '.mypy_cache',
+        'target', 'vendor', 'CMakeFiles', '_deps',
+        'Output', 'Listings', 'Objects', 'DebugConfig', 'RTE',
+        '.gradle', '.idea', 'out', 'Pods', 'DerivedData',
+        'venv', '.venv', 'env', '.env',
+    }
+
 
 @dataclass
 class ProjectTypeRule:
@@ -139,17 +161,6 @@ class ProjectDetector:
         ProjectTypeRule(['project.godot'], 'godot', 'gdscript', 95, 'godot'),
     ]
 
-    # 排除目录
-    EXCLUDE_DIRS = {
-        '.git', '.svn', '.hg', '.idea', '.vscode',
-        'node_modules', 'dist', 'build', 'out', 'bin', 'obj',
-        '__pycache__', '.pytest_cache', '.mypy_cache',
-        'target', 'vendor', 'CMakeFiles', '_deps',
-        'Output', 'Listings', 'Objects', 'DebugConfig', 'RTE',
-        '.gradle', '.idea', 'out', 'Pods', 'DerivedData',
-        'venv', '.venv', 'env', '.env',
-    }
-
     # 类缓存
     _cache: Dict[str, Dict[str, Any]] = {}
     _cache_ttl: int = 300  # 5分钟缓存
@@ -163,15 +174,18 @@ class ProjectDetector:
     def detect(self) -> Dict[str, Any]:
         """执行探测"""
         start_time = time.time()
+        logger.debug(f"开始探测项目: {self.target_dir}")
 
         # 检查缓存
         cache_key = self._get_cache_key()
         if cache_key in self._cache:
             cached = self._cache[cache_key]
             if time.time() - cached['timestamp'] < self._cache_ttl:
+                logger.debug("使用缓存结果")
                 return cached['result']
 
         if not self.target_dir.exists():
+            logger.error(f"目录不存在: {self.target_dir}")
             return {'error': f'Directory not found: {self.target_dir}'}
 
         # 执行探测
@@ -336,7 +350,7 @@ class ProjectDetector:
                     content = fp.read().lower()
                     if pattern.lower() in content:
                         return True
-            except:
+            except (IOError, OSError):
                 continue
 
         return False
@@ -569,7 +583,7 @@ class ProjectDetector:
                                     'type': dep_type,
                                     'source': 'package.json'
                                 })
-            except:
+            except (IOError, OSError, json.JSONDecodeError):
                 pass
 
         # requirements.txt
@@ -588,7 +602,7 @@ class ProjectDetector:
                                     'type': 'dependency',
                                     'source': 'requirements.txt'
                                 })
-            except:
+            except (IOError, OSError):
                 pass
 
         # Cargo.toml
@@ -612,7 +626,7 @@ class ProjectDetector:
                             'type': 'dependency',
                             'source': 'Cargo.toml'
                         })
-            except:
+            except (IOError, OSError):
                 pass
 
         return dependencies[:50]  # 限制数量

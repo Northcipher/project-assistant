@@ -338,7 +338,7 @@ python3 {baseDir}/scripts/utils/cache_manager.py check "$PROJECT_DIR"
 | 配置文件变更 | package.json, CMakeLists.txt 等被修改 |
 | Git 有未提交变更 | 存在 modified/added/deleted 文件 |
 | 新的提交 | HEAD 改变 |
-| TTL 过期 | 默认 1 小时 |
+| TTL 过期 | 默认 24 小时 |
 
 ### 缓存更新
 

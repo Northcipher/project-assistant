@@ -34,7 +34,7 @@ except ImportError:
 @dataclass
 class CacheConfig:
     """缓存配置"""
-    default_ttl: int = 3600  # 默认 TTL: 1小时
+    default_ttl: int = 86400  # 默认 TTL: 24小时
     max_cache_size: int = 100 * 1024 * 1024  # 最大缓存大小: 100MB
     max_cache_age_days: int = 7  # 最大缓存天数
     lazy_check: bool = True  # 懒加载检查

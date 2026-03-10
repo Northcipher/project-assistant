@@ -1,3 +1,14 @@
+---
+name: project-assistant
+description: 项目初始化与智能分析工具。当用户要求初始化新项目、分析项目结构、生成README、项目问答时使用。支持Python、Node.js、Web、Mobile、Desktop、Embedded等多种项目类型。触发词：初始化项目、init、分析项目、项目问答。
+metadata:
+  openclaw:
+    emoji: "🚀"
+    homepage: "https://github.com/Northcipher/project-assistant"
+    requires:
+      bins: ["python3"]
+---
+
 # project-assistant (项目百事通)
 
 你是一个项目的全能助手，能够回答关于项目的任何问题。你的角色可以是项目经理、软件开发工程师、架构师、测试工程师等，根据问题类型自动切换视角。
@@ -24,6 +35,381 @@ TRIGGER when: 用户询问项目相关问题，如：
 | 项目进度、模块划分 | 项目经理 | 里程碑、依赖关系、风险点 |
 | 测试覆盖、质量问题 | 测试工程师 | 测试用例、边界条件、覆盖率 |
 | 部署运维、配置管理 | DevOps | 部署流程、环境配置、监控 |
+
+---
+
+# /init (项目初始化)
+
+项目初始化主入口。自动探测项目类型，分发到对应的分析子模块，生成项目文档。
+
+## 使用方式
+
+```
+/init [目录路径] [选项]
+```
+
+### 参数说明
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `目录路径` | 要初始化的项目目录 | 当前目录 |
+| `--force` | 强制重新扫描，忽略缓存 | false |
+| `--depth=N` | 扫描深度 | 3 |
+| `--verbose` | 显示详细日志 | false |
+| `--quick` | 快速模式，只扫描顶层 | false |
+
+### 示例
+
+```bash
+# 初始化当前目录
+/init
+
+# 初始化指定目录
+/init /path/to/project
+
+# 强制重新扫描
+/init --force
+
+# 限制扫描深度
+/init --depth=2
+```
+
+## 执行流程
+
+### Step 1: 探测项目类型
+
+运行探测器获取项目信息：
+
+```bash
+python3 {baseDir}/scripts/detector.py "$TARGET_DIR"
+```
+
+探测器返回JSON格式：
+
+```json
+{
+  "project_type": "android-app",
+  "secondary_types": ["gradle-java"],
+  "language": "kotlin",
+  "build_system": "gradle",
+  "entry_points": ["app/src/main/java/.../MainActivity.kt"],
+  "config_files": ["build.gradle.kts", "AndroidManifest.xml"],
+  "dependencies": [...],
+  "modules": ["app", "core", "data"],
+  "target_platform": "android",
+  "confidence": 0.95
+}
+```
+
+#### 项目类型优先级
+
+当多个规则匹配时，按以下优先级选择：
+
+1. **精确标识文件** (优先级 90-100)
+   - `AndroidManifest.xml` → android-app
+   - `*.xcodeproj` → ios
+   - `*.ioc` → stm32
+
+2. **构建配置文件** (优先级 80-90)
+   - `build.gradle` + 目录结构 → android-app
+   - `pom.xml` → maven
+   - `package.json` + 框架特征 → react/vue/angular
+
+3. **目录结构特征** (优先级 60-80)
+   - `frameworks/`, `system/` → aosp
+   - `Assets/`, `ProjectSettings/` → unity
+
+#### 歧义处理
+
+当项目类型无法确定时：
+
+```
+检测到多个可能的项目类型:
+  1. react (置信度: 0.85)
+  2. nextjs (置信度: 0.80)
+
+请选择项目类型 [1/2/a(uto)]:
+```
+
+选择 `auto` 会自动选择置信度最高的类型。
+
+### Step 2: 加载对应子模块
+
+根据 `project_type` 加载子skill：
+
+| project_type | 子skill | 说明 |
+|-------------|---------|------|
+| `android-app` | `references/templates/mobile/android.md` | Android 应用 |
+| `android-ndk` | `references/templates/embedded/android-native.md` | Android NDK |
+| `aosp` | `references/templates/embedded/android-native.md` | AOSP 系统源码 |
+| `ios` | `references/templates/mobile/ios.md` | iOS 应用 |
+| `stm32`, `esp32`, `pico`, `keil`, `iar` | `references/templates/embedded/mcu.md` | MCU 嵌入式 |
+| `freertos`, `zephyr`, `rt-thread` | `references/templates/embedded/rtos.md` | RTOS 项目 |
+| `embedded-linux`, `buildroot`, `yocto` | `references/templates/embedded/linux.md` | 嵌入式 Linux |
+| `qnx` | `references/templates/embedded/qnx.md` | QNX 系统 |
+| `react`, `vue`, `angular`, `svelte`, `nextjs`, `nuxt` | `references/templates/web/frontend.md` | Web 前端 |
+| `django`, `fastapi`, `flask` | `references/templates/web/backend.md` | Web 后端 |
+| `electron`, `qt` | `references/templates/desktop/desktop.md` | 桌面应用 |
+| `cmake`, `makefile`, `go`, `rust` | `references/templates/system/native.md` | 原生/系统项目 |
+| `flutter` | `references/templates/desktop/desktop.md` | Flutter 应用 |
+| 未知类型 | 使用通用模板分析 | 通用项目 |
+
+#### 子模块加载失败处理
+
+```
+[警告] 子模块 references/templates/mobile/android.md 不存在
+[回退] 使用通用模板进行分析
+```
+
+### Step 3: 执行分析
+
+子skill负责：
+
+1. **详细分析项目结构**
+   - 目录树生成
+   - 模块划分识别
+   - 关键目录标注
+
+2. **解析配置文件** (可调用Python工具)
+   ```bash
+   python3 {baseDir}/scripts/parsers/gradle_parser.py "$PROJECT_DIR"
+   python3 {baseDir}/scripts/parsers/cmake_parser.py "$PROJECT_DIR"
+   python3 {baseDir}/scripts/parsers/package_json_parser.py "$PROJECT_DIR"
+   ```
+
+3. **提取核心功能**
+   - 入口点分析
+   - 主要模块功能推断
+   - API 端点识别
+
+4. **生成项目文档**
+   - 输出到 `.claude/project.md`
+
+### Step 4: 输出结果
+
+在目标目录生成 `.claude/project.md`
+
+#### 进度显示
+
+```
+[1/4] 探测项目类型... ✓ android-app (置信度: 95%)
+[2/4] 分析项目结构... ████████████████████ 100%
+[3/4] 解析配置文件... ✓ build.gradle.kts, AndroidManifest.xml
+[4/4] 生成项目文档... ✓ .claude/project.md
+
+完成！项目文档已生成。
+```
+
+#### 分层文档结构
+
+采用**分层 + 索引**架构，优化 Token 消耗：
+
+```
+.claude/
+├── project.md           # L0: 项目概览 (~1-2KB)
+├── index/               # 数据索引（JSON 格式）
+│   ├── subsystems.json  # 子系统索引
+│   ├── processes.json   # 进程索引
+│   ├── ipc.json         # IPC 接口索引
+│   └── structure.json   # 目录结构索引
+├── docs/                # 详细文档（按需生成）
+│   ├── subsystems/      # 子系统文档
+│   │   └── {name}/
+│   │       ├── index.md     # L1: 子系统摘要
+│   │       └── {process}.md # L2: 进程详情
+│   └── ipc/
+│       └── overview.md      # L2: IPC 详情
+├── cache.json           # 缓存
+└── qa_cache.json        # Q&A 缓存
+```
+
+#### L0: project.md 内容（精简版）
+
+```markdown
+# 智能座舱系统
+
+> 类型: embedded-linux | 进程: 15 | 接口: 23
+
+## 子系统
+
+| 子系统 | 进程数 | 说明 |
+|--------|--------|------|
+| vehicle | 5 | 车辆控制 |
+| infotainment | 6 | 信息娱乐 |
+| adas | 4 | 辅助驾驶 |
+
+## 快速命令
+
+```bash
+make all      # 构建
+make run      # 运行
+```
+
+## 数据索引
+
+| 数据 | 文件 |
+|------|------|
+| 进程列表 | index/processes.json |
+| IPC 接口 | index/ipc.json |
+
+## 详细文档
+
+详细文档按需生成，参见 `docs/` 目录
+```
+
+#### Token 消耗对比
+
+| 项目规模 | 优化前 project.md | 优化后 L0 | 节省 |
+|---------|------------------|----------|------|
+| 小型 | 5-10 KB | 1-2 KB | 80% |
+| 中型 | 20-50 KB | 2-3 KB | 90% |
+| 大型 | 50-100 KB | 3-5 KB | 95% |
+
+#### 文档生成命令
+
+```bash
+# 生成 L0 项目概览
+python3 {baseDir}/scripts/utils/doc_generator.py l0 "$PROJECT_DIR"
+
+# 生成 L1 子系统文档（按需）
+python3 {baseDir}/scripts/utils/doc_generator.py l1 "$PROJECT_DIR" "vehicle"
+
+# 生成 L2 进程详情（按需）
+python3 {baseDir}/scripts/utils/doc_generator.py l2-process "$PROJECT_DIR" "vehicle" "vehicle_service"
+
+# 生成 L2 IPC 文档（按需）
+python3 {baseDir}/scripts/utils/doc_generator.py l2-ipc "$PROJECT_DIR"
+
+# 查看文档结构
+python3 {baseDir}/scripts/utils/doc_generator.py structure "$PROJECT_DIR"
+```
+
+## 大型项目处理策略
+
+### 自动检测项目规模
+
+```bash
+# detector.py 返回规模信息
+{
+  "project_type": "embedded-linux",
+  "scale": "large",
+  "file_count": 15000,
+  "subsystems": ["vehicle", "infotainment", "adas"],
+  "processes": ["vehicle_service", "media_server", "adas_core"],
+  "ipc_protocols": ["binder", "dbus", "socket"]
+}
+```
+
+### 懒加载详细文档
+
+对于大型项目，详细文档**按需生成**：
+
+```
+用户问: "vehicle_service 进程是怎么实现的？"
+
+系统:
+1. 检查 .claude/docs/subsystems/vehicle/vehicle_service.md 是否存在
+2. 不存在 → 分析代码 → 生成文档 → 缓存
+3. 返回答案
+```
+
+### IPC 通信分析
+
+```bash
+python3 {baseDir}/scripts/analyzers/ipc_analyzer.py "$PROJECT_DIR"
+```
+
+## 缓存机制
+
+### 缓存位置
+
+`.claude/cache.json`
+
+### 缓存有效性检查
+
+```bash
+python3 {baseDir}/scripts/utils/cache_manager.py check "$PROJECT_DIR"
+```
+
+缓存失效条件：
+
+| 条件 | 说明 |
+|------|------|
+| 配置文件变更 | package.json, CMakeLists.txt 等被修改 |
+| Git 有未提交变更 | 存在 modified/added/deleted 文件 |
+| 新的提交 | HEAD 改变 |
+| TTL 过期 | 默认 1 小时 |
+
+### 缓存更新
+
+```bash
+# 检查并更新缓存
+python3 {baseDir}/scripts/utils/cache_manager.py update "$PROJECT_DIR"
+
+# 增量更新（保留部分缓存）
+python3 {baseDir}/scripts/utils/cache_manager.py update "$PROJECT_DIR" --incremental
+
+# 清除缓存
+python3 {baseDir}/scripts/utils/cache_manager.py clear "$PROJECT_DIR"
+```
+
+## 错误处理
+
+| 场景 | 处理方式 |
+|------|---------|
+| 项目目录不存在 | 返回错误：`Directory not found: {path}` |
+| 无法识别项目类型 | 提示用户选择或使用通用模板 |
+| 子 skill 不存在 | 回退到通用模板，记录警告 |
+| 配置文件解析失败 | 跳过该文件，继续其他分析 |
+| 权限不足 | 跳过无法访问的目录 |
+| 超大项目 | 自动限制扫描深度和文件数量 |
+
+### 错误示例
+
+```
+[错误] 无法解析 build.gradle.kts
+  - 原因: 语法错误于第 45 行
+  - 跳过该文件，继续分析
+
+[警告] 扫描深度达到限制 (depth=3)
+  - 部分深层目录未扫描
+  - 使用 --depth=N 增加深度
+```
+
+## 大型项目优化
+
+### 自动限制
+
+对于大型项目（文件数 > 10000 或目录数 > 1000）：
+
+- 自动限制扫描深度到 2
+- 跳过 `node_modules`, `build`, `.gradle` 等目录
+- 只解析顶层配置文件
+
+### 手动控制
+
+```bash
+# 快速模式：只扫描顶层
+/init --quick
+
+# 限制深度
+/init --depth=2
+
+# 详细输出（用于调试）
+/init --verbose
+```
+
+## 敏感信息处理
+
+- `.env` 等敏感文件只标注存在，不暴露内容
+- API 密钥、密码等自动脱敏
+- 生产环境配置仅记录结构
+
+---
+
+# /project-assistant (项目问答)
+
+项目问答功能。智能回答关于项目的任何问题。
 
 ## 执行流程
 
@@ -64,13 +450,13 @@ TRIGGER when: 用户询问项目相关问题，如：
 
 ```bash
 # 快速检查（只检查时间戳）
-python3 ~/.claude/tools/init/utils/cache_manager.py check "$PROJECT_DIR" --quick
+python3 {baseDir}/scripts/utils/cache_manager.py check "$PROJECT_DIR" --quick
 
 # 完整检查
-python3 ~/.claude/tools/init/utils/cache_manager.py check "$PROJECT_DIR"
+python3 {baseDir}/scripts/utils/cache_manager.py check "$PROJECT_DIR"
 
 # 增量更新
-python3 ~/.claude/tools/init/utils/cache_manager.py update "$PROJECT_DIR" --incremental
+python3 {baseDir}/scripts/utils/cache_manager.py update "$PROJECT_DIR" --incremental
 ```
 
 ### Step 4: 检查 Q&A 缓存
@@ -78,7 +464,7 @@ python3 ~/.claude/tools/init/utils/cache_manager.py update "$PROJECT_DIR" --incr
 在分析问题前，先检查是否已有缓存答案：
 
 ```bash
-python3 ~/.claude/tools/init/utils/qa_cache.py get "$PROJECT_DIR" "$USER_QUESTION"
+python3 {baseDir}/scripts/utils/qa_cache.py get "$PROJECT_DIR" "$USER_QUESTION"
 ```
 
 **缓存命中时**：
@@ -126,7 +512,7 @@ python3 ~/.claude/tools/init/utils/qa_cache.py get "$PROJECT_DIR" "$USER_QUESTIO
 
 ```bash
 # 从缓存读取项目规模
-python3 ~/.claude/tools/init/utils/cache_manager.py info "$PROJECT_DIR"
+python3 {baseDir}/scripts/utils/cache_manager.py info "$PROJECT_DIR"
 ```
 
 返回：
@@ -172,13 +558,13 @@ python3 ~/.claude/tools/init/utils/cache_manager.py info "$PROJECT_DIR"
 
 ```bash
 # 检查文档结构
-python3 ~/.claude/tools/init/utils/doc_generator.py structure "$PROJECT_DIR"
+python3 {baseDir}/scripts/utils/doc_generator.py structure "$PROJECT_DIR"
 
 # 生成 L1 子系统文档
-python3 ~/.claude/tools/init/utils/doc_generator.py l1 "$PROJECT_DIR" "vehicle"
+python3 {baseDir}/scripts/utils/doc_generator.py l1 "$PROJECT_DIR" "vehicle"
 
 # 生成 L2 进程详情
-python3 ~/.claude/tools/init/utils/doc_generator.py l2-process "$PROJECT_DIR" "vehicle" "vehicle_service"
+python3 {baseDir}/scripts/utils/doc_generator.py l2-process "$PROJECT_DIR" "vehicle" "vehicle_service"
 ```
 
 **工作流程**：
@@ -216,10 +602,10 @@ print(json.dumps(data, indent=2))
 
 ```bash
 # 分析跨进程通信
-python3 ~/.claude/tools/init/analyzers/ipc_analyzer.py "$PROJECT_DIR"
+python3 {baseDir}/scripts/analyzers/ipc_analyzer.py "$PROJECT_DIR"
 
 # 生成 IPC 文档
-python3 ~/.claude/tools/init/analyzers/ipc_analyzer.py "$PROJECT_DIR" --doc
+python3 {baseDir}/scripts/analyzers/ipc_analyzer.py "$PROJECT_DIR" --doc
 ```
 
 ### Step 7: 分析问题并回答
@@ -257,7 +643,7 @@ npm run dev      # 开发模式
 回答完成后，将问答缓存起来：
 
 ```bash
-python3 ~/.claude/tools/init/utils/qa_cache.py set "$PROJECT_DIR" "$QUESTION" "$ANSWER"
+python3 {baseDir}/scripts/utils/qa_cache.py set "$PROJECT_DIR" "$QUESTION" "$ANSWER"
 ```
 
 **缓存内容**：
@@ -272,13 +658,13 @@ python3 ~/.claude/tools/init/utils/qa_cache.py set "$PROJECT_DIR" "$QUESTION" "$
 
 ```bash
 # 分析函数调用链
-python3 ~/.claude/tools/init/utils/call_chain_analyzer.py "$PROJECT_DIR" "$FUNCTION_NAME"
+python3 {baseDir}/scripts/utils/call_chain_analyzer.py "$PROJECT_DIR" "$FUNCTION_NAME"
 
 # 分析影响范围
-python3 ~/.claude/tools/init/utils/call_chain_analyzer.py "$PROJECT_DIR" "$FUNCTION_NAME" --impact
+python3 {baseDir}/scripts/utils/call_chain_analyzer.py "$PROJECT_DIR" "$FUNCTION_NAME" --impact
 
 # 指定方向和深度
-python3 ~/.claude/tools/init/utils/call_chain_analyzer.py "$PROJECT_DIR" "$FUNCTION_NAME" --depth=5 --direction=calls
+python3 {baseDir}/scripts/utils/call_chain_analyzer.py "$PROJECT_DIR" "$FUNCTION_NAME" --depth=5 --direction=calls
 ```
 
 输出调用链：
@@ -296,7 +682,7 @@ main() [src/main.ts:15]
 在回答中集成Git信息：
 
 ```bash
-python3 ~/.claude/tools/init/utils/git_info.py "$PROJECT_DIR"
+python3 {baseDir}/scripts/utils/git_info.py "$PROJECT_DIR"
 ```
 
 获取信息：
@@ -413,7 +799,7 @@ LoginPage.onSubmit()
 
 ```bash
 # 只更新受影响的部分
-python3 ~/.claude/tools/init/utils/cache_manager.py update "$PROJECT_DIR" --incremental
+python3 {baseDir}/scripts/utils/cache_manager.py update "$PROJECT_DIR" --incremental
 ```
 
 ## 会话上下文管理
@@ -521,13 +907,13 @@ python3 ~/.claude/tools/init/utils/cache_manager.py update "$PROJECT_DIR" --incr
 
 ```bash
 # 检查问题是否已缓存
-python3 ~/.claude/tools/init/utils/qa_cache.py get "$PROJECT_DIR" "$QUESTION"
+python3 {baseDir}/scripts/utils/qa_cache.py get "$PROJECT_DIR" "$QUESTION"
 
 # 缓存问答
-python3 ~/.claude/tools/init/utils/qa_cache.py set "$PROJECT_DIR" "$QUESTION" "$ANSWER"
+python3 {baseDir}/scripts/utils/qa_cache.py set "$PROJECT_DIR" "$QUESTION" "$ANSWER"
 
 # 查看缓存统计
-python3 ~/.claude/tools/init/utils/qa_cache.py stats "$PROJECT_DIR"
+python3 {baseDir}/scripts/utils/qa_cache.py stats "$PROJECT_DIR"
 ```
 
 ### 相似问题匹配
@@ -546,7 +932,7 @@ python3 ~/.claude/tools/init/utils/qa_cache.py stats "$PROJECT_DIR"
 
 ```bash
 # 变更文件后清理相关缓存
-python3 ~/.claude/tools/init/utils/qa_cache.py cleanup "$PROJECT_DIR"
+python3 {baseDir}/scripts/utils/qa_cache.py cleanup "$PROJECT_DIR"
 ```
 
 | 变更类型 | 失效策略 |
@@ -816,3 +1202,83 @@ await payment.process(order);
 
 （相似度: 0.85，缓存于 2024-03-10 10:05）
 ```
+
+---
+
+## 工具命令参考
+
+```bash
+# 项目探测
+python3 {baseDir}/scripts/detector.py ./project
+
+# IPC 分析
+python3 {baseDir}/scripts/analyzers/ipc_analyzer.py ./project --doc
+
+# 调用链分析
+python3 {baseDir}/scripts/utils/call_chain_analyzer.py ./project main --impact
+
+# TODO 提取
+python3 {baseDir}/scripts/analyzers/todo_extractor.py ./project --md
+
+# 测试分析
+python3 {baseDir}/scripts/analyzers/test_analyzer.py ./project
+
+# CI/CD 解析
+python3 {baseDir}/scripts/parsers/cicd_parser.py ./project
+
+# 环境变量扫描
+python3 {baseDir}/scripts/analyzers/env_scanner.py ./project
+```
+
+---
+
+## 支持的项目类型
+
+| 分类 | 类型 |
+|------|------|
+| **嵌入式MCU** | STM32, ESP32, Arduino, Pico, Keil, IAR |
+| **嵌入式RTOS** | FreeRTOS, Zephyr, RT-Thread |
+| **嵌入式Linux** | Yocto, Buildroot, OpenWrt, QNX |
+| **Android** | 应用, NDK, AOSP |
+| **iOS** | Swift, SwiftUI |
+| **Web前端** | React, Vue, Angular, Svelte, Next.js |
+| **Web后端** | Django, FastAPI, Flask, Spring |
+| **桌面应用** | Qt, Electron, Flutter |
+| **系统编程** | C/C++, Rust, Go |
+
+---
+
+## 目录结构
+
+```
+project-assistant/
+├── SKILL.md                    # 主入口（本文件）
+├── scripts/                    # Python 工具脚本
+│   ├── detector.py             # 项目类型探测器
+│   ├── constants.py            # 统一常量
+│   ├── parsers/                # 配置文件解析器
+│   ├── analyzers/              # 代码分析器
+│   └── utils/                  # 工具函数
+├── references/                 # 参考资源
+│   └── templates/              # 子 Skill 模板
+│       ├── embedded/           # 嵌入式项目模板
+│       ├── mobile/             # 移动端项目模板
+│       ├── web/                # Web 项目模板
+│       ├── desktop/            # 桌面应用模板
+│       └── system/             # 系统编程模板
+├── tests/                      # 测试套件
+├── README.md                   # 项目说明
+└── LICENSE                     # MIT 许可证
+```
+
+---
+
+## 依赖
+
+- Python 3.6+
+- Git（可选）
+- PyYAML（可选，CI/CD 解析）
+
+## 许可证
+
+MIT License

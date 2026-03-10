@@ -10,13 +10,59 @@
 - **大型项目支持** - 自动检测规模、子系统、进程、IPC 协议
 - **50+ 项目类型** - 覆盖嵌入式、移动端、Web、桌面、系统编程
 
-## 快速开始
+## 安装
+
+### 通过 ClawHub 安装（推荐）
 
 ```bash
-# 放置文件到 ~/.claude/
-# 使用
+claw install project-assistant
+```
+
+### 手动安装
+
+```bash
+# 克隆到 OpenClaw skills 目录
+git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/project-assistant
+```
+
+### 工作区安装
+
+将项目放置在工作区的 `.claude/skills/` 目录下：
+
+```
+your-project/
+└── .claude/
+    └── skills/
+        └── project-assistant/
+```
+
+## 使用
+
+```
 /init [项目目录]          # 初始化项目
 /project-assistant        # 项目问答
+```
+
+### 初始化示例
+
+```bash
+# 初始化当前目录
+/init
+
+# 初始化指定目录
+/init /path/to/project
+
+# 强制重新扫描
+/init --force
+```
+
+### 问答示例
+
+```
+用户: 这个项目的架构是什么？
+用户: 登录功能是怎么实现的？
+用户: main函数在哪里？
+用户: 修改XXX会影响什么？
 ```
 
 ## Token 消耗预测
@@ -105,50 +151,49 @@
 ## 目录结构
 
 ```
-skills/
-├── init.md               # 项目初始化入口
-└── project-assistant.md  # 项目问答入口
-
-commands/init/             # 子 Skill（按平台分类）
-├── embedded/             # MCU/RTOS/Linux/QNX/Android-NDK
-├── mobile/               # Android/iOS
-├── web/                  # Frontend/Backend
-├── desktop/              # Qt/Electron/Flutter
-└── system/               # Native
-
-tools/init/
-├── detector.py           # 项目类型探测器
-├── constants.py          # 统一常量
-├── parsers/              # 15个解析器（Gradle/CMake/npm/Cargo/CI-CD等）
-├── analyzers/            # 6个分析器（IPC/TODO/测试/环境变量等）
-└── utils/                # 缓存/文档生成/调用链/Git信息等
-
-tests/                     # pytest 测试套件
+project-assistant/
+├── SKILL.md                    # 主入口（含 YAML frontmatter）
+├── scripts/                    # Python 工具脚本
+│   ├── detector.py             # 项目类型探测器
+│   ├── constants.py            # 统一常量
+│   ├── parsers/                # 配置文件解析器
+│   ├── analyzers/              # 代码分析器
+│   └── utils/                  # 工具函数
+├── references/                 # 参考资源
+│   └── templates/              # 子 Skill 模板
+│       ├── embedded/           # 嵌入式项目模板
+│       ├── mobile/             # 移动端项目模板
+│       ├── web/                # Web 项目模板
+│       ├── desktop/            # 桌面应用模板
+│       └── system/             # 系统编程模板
+├── tests/                      # 测试套件
+├── README.md                   # 本文件
+└── LICENSE                     # MIT 许可证
 ```
 
 ## 工具命令
 
 ```bash
 # 项目探测
-python tools/init/detector.py ./project
+python3 {baseDir}/scripts/detector.py ./project
 
 # IPC 分析
-python tools/init/analyzers/ipc_analyzer.py ./project --doc
+python3 {baseDir}/scripts/analyzers/ipc_analyzer.py ./project --doc
 
 # 调用链分析
-python tools/init/utils/call_chain_analyzer.py ./project main --impact
+python3 {baseDir}/scripts/utils/call_chain_analyzer.py ./project main --impact
 
 # TODO 提取
-python tools/init/analyzers/todo_extractor.py ./project --md
+python3 {baseDir}/scripts/analyzers/todo_extractor.py ./project --md
 
 # 测试分析
-python tools/init/analyzers/test_analyzer.py ./project
+python3 {baseDir}/scripts/analyzers/test_analyzer.py ./project
 
 # CI/CD 解析
-python tools/init/parsers/cicd_parser.py ./project
+python3 {baseDir}/scripts/parsers/cicd_parser.py ./project
 
 # 环境变量扫描
-python tools/init/analyzers/env_scanner.py ./project
+python3 {baseDir}/scripts/analyzers/env_scanner.py ./project
 ```
 
 ## 角色覆盖

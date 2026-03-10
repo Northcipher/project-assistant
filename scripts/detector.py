@@ -257,7 +257,7 @@ class ProjectDetector:
         try:
             for root, dirnames, filenames in os.walk(self.target_dir):
                 # 排除特定目录
-                dirnames[:] = [d for d in dirnames if d not in self.EXCLUDE_DIRS]
+                dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
 
                 rel_root = os.path.relpath(root, self.target_dir)
                 depth = 0 if rel_root == '.' else rel_root.count(os.sep) + 1

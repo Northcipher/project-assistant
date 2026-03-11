@@ -1,22 +1,26 @@
-# Project Assistant
+# Project Assistant 🚀
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-为 OpenClaw 设计的项目分析工具集，提供项目初始化和智能问答功能。
+> 为 OpenClaw 设计的项目分析工具集，群聊单聊都能用！
 
-## 为什么选择 Project Assistant？
+---
 
-### 节省 80-95% Token 消耗
+## ✨ 亮点速览
 
-传统方式一次性加载整个项目文档，消耗 50,000-100,000 Token。Project Assistant 采用**分层文档架构**：
+### 💰 Token 消耗直接砍掉 80%-95%！
 
-| 方式 | Token 消耗 | 节省 |
-|------|-----------|------|
+传统方式一次性加载整个项目文档，动辄 5-10 万 Token 😱
+
+我们采用**分层文档架构**：
+
+| 对比项 | Token 消耗 | 省了多少 |
+|--------|-----------|---------|
 | 传统一次性文档 | 50,000-100,000 | - |
-| Project Assistant L0 | ~11,500 | **77-88%** |
-| 后续问答（缓存命中） | ~0 | **接近 100%** |
+| 我们 L0 概览 | ~11,500 | **77-88%** |
+| 后续问答缓存命中 | ~0 | **接近 100%** |
 
-### 50+ 项目类型支持
+### 🎯 50+ 项目类型一键识别
 
 | 分类 | 支持类型 |
 |------|---------|
@@ -30,39 +34,66 @@
 | 桌面应用 | Qt, Electron, Flutter |
 | 系统编程 | C/C++, Rust, Go |
 
-### 核心功能
+### 🔥 新功能：跨会话工作目录
 
-- **智能问答** - 自动识别问题类型，提供精准回答
-- **调用链分析** - 支持 7 种语言的函数调用追踪
-- **IPC 分析** - Binder/DBus/gRPC/SOME/IP/Socket
-- **影响分析** - 修改代码前预知影响范围
-- **大型项目支持** - 自动检测子系统、进程、IPC 协议
+**群聊、单聊、不同会话，一个配置全搞定！**
 
-## 快速开始
+```
+# 设置一次，到处能用
+/set-workdir /home/user/projects/my-project
+
+# 群聊里问
+@OpenClaw 这个项目的架构是什么？
+
+# 单聊里问
+这个功能怎么实现的？
+```
+
+再也不用每次都指定路径了 🎉
+
+---
+
+## 🛠️ 核心功能
+
+| 功能 | 说明 |
+|------|------|
+| 🤖 智能问答 | 自动识别问题类型，精准回答 |
+| 🔗 调用链分析 | 支持 7 种语言，函数调用一追到底 |
+| 📡 IPC 分析 | Binder/DBus/gRPC/SOME/IP/Socket |
+| ⚡ 影响分析 | 改代码前就知道会影响谁 |
+| 🏗️ 大型项目 | 自动识别子系统、进程、IPC 协议 |
+| 💾 智能缓存 | 相似问题秒回，Token 省到底 |
+
+---
+
+## 📦 快速开始
 
 ### 安装
 
 ```bash
-# 通过 ClawHub 安装（推荐）
+# ClawHub 安装（推荐）
 claw install project-assistant
 
-# 或手动安装
+# 手动安装
 git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/project-assistant
 ```
 
-### 使用
+### 基本使用
 
 ```
-/init                    # 初始化当前项目
-/init /path/to/project   # 初始化指定项目
-/project-assistant       # 项目问答模式
+/set-workdir /path/to/project    # 设置工作目录（跨会话有效）
+/init                            # 初始化项目
+/init /path/to/project           # 初始化指定项目
+/show-workdir                    # 查看当前工作目录
 ```
 
-### 示例
+### 示例对话
 
 **初始化项目：**
+
 ```
 用户: /init
+
 助手: [1/4] 探测项目类型... ✓ react (置信度: 95%)
       [2/4] 分析项目结构... ✓ src/, components/, hooks/
       [3/4] 解析配置文件... ✓ package.json, tsconfig.json
@@ -70,11 +101,13 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
 ```
 
 **智能问答：**
+
 ```
 用户: 登录功能是怎么实现的？
+
 助手: ## 登录实现
 
-      通过 `AuthService` + `JwtUtil` 实现，主要流程：
+      通过 `AuthService` + `JwtUtil` 实现：
 
       1. 前端提交 → `LoginApi.login()`
       2. 后端验证 → `AuthService.authenticate()`
@@ -83,27 +116,28 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
       相关代码：
       - `src/pages/Login.tsx:45-78`
       - `src/api/auth.ts:23-56`
+```
 
-用户: main函数在哪里？
-助手: `src/main.ts:15`
+**影响分析：**
 
+```
 用户: 修改 login 函数会影响什么？
+
 助手: ## 影响分析: login
 
       ### 直接调用者
       - `src/pages/Login.tsx:45` - handleLogin
       - `src/pages/Signup.tsx:78` - autoLogin
-      - `src/utils/session.ts:12` - restoreSession
 
       ### 测试覆盖
       - `src/tests/auth.test.ts` - 3 个测试用例
 ```
 
-## 飞书群聊场景
+---
 
-接入 OpenClaw 后，不同角色可在飞书群聊中使用：
+## 🏢 飞书群聊场景
 
-### 开发工程师
+### 👨‍💻 开发工程师
 
 ```
 @OpenClaw 登录功能在哪？
@@ -111,9 +145,7 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
 @OpenClaw 调用链：从 main 到 UserService
 ```
 
-快速定位代码、了解实现细节、评估修改影响。
-
-### 测试工程师
+### 🧪 测试工程师
 
 ```
 @OpenClaw 登录模块有哪些测试用例？
@@ -121,9 +153,7 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
 @OpenClaw 这个接口的边界条件是什么？
 ```
 
-了解测试覆盖、查找测试用例、分析边界条件。
-
-### 产品经理
+### 📋 产品经理
 
 ```
 @OpenClaw 这个项目有多少个模块？
@@ -131,9 +161,7 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
 @OpenClaw 项目的技术栈是什么？
 ```
 
-了解项目进度、功能实现情况、技术选型。
-
-### 运维工程师
+### 🔧 运维工程师
 
 ```
 @OpenClaw 项目的 CI/CD 配置在哪？
@@ -141,9 +169,7 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
 @OpenClaw 如何构建和部署？
 ```
 
-了解部署配置、环境依赖、构建流程。
-
-### 新人入职
+### 🎓 新人入职
 
 ```
 @OpenClaw 帮我初始化这个项目
@@ -151,9 +177,7 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
 @OpenClaw 从哪里开始看代码？
 ```
 
-快速上手项目，减少导师负担。
-
-### 技术 Leader
+### 👔 技术 Leader
 
 ```
 @OpenClaw 这个模块的复杂度如何？
@@ -161,9 +185,9 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
 @OpenClaw IPC 通信架构是怎样的？
 ```
 
-架构评审、技术债务追踪、代码审查准备。
+---
 
-## 架构亮点
+## 🏗️ 架构设计
 
 ### 分层文档结构
 
@@ -183,21 +207,23 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
 
 ### 缓存机制
 
-缓存失效检测有多重保障，不会频繁重新分析：
+- ✅ Git 状态检测 - 有未提交变更时更新
+- ✅ 配置文件变更 - package.json 等被修改时更新
+- ✅ 提交变化 - HEAD commit 改变时更新
+- ✅ TTL 过期 - 默认 24 小时
+- ✅ Q&A 缓存 - 相似问题自动匹配，有效期 7 天
 
-- **Git 状态检测** - 有未提交变更时更新
-- **配置文件变更** - package.json 等被修改时更新
-- **提交变化** - HEAD commit 改变时更新
-- **TTL 过期** - 默认 24 小时
-- **Q&A 缓存** - 相似问题自动匹配，有效期 7 天
+---
 
-## 项目结构
+## 📁 项目结构
 
 ```
 project-assistant/
-├── SKILL.md              # 主入口（YAML frontmatter）
-├── scripts/              # Python 工具脚本
+├── SKILL.md              # 主入口
+├── config.json           # 工作目录配置（跨会话共享）✨新增
+├── scripts/
 │   ├── detector.py       # 项目类型探测器
+│   ├── config_manager.py # 配置管理器 ✨新增
 │   ├── parsers/          # 14 个配置文件解析器
 │   ├── analyzers/        # 6 个代码分析器
 │   └── utils/            # 工具函数
@@ -205,12 +231,38 @@ project-assistant/
 └── tests/                # 测试套件
 ```
 
-## 依赖
+---
+
+## 📋 更新日志
+
+### v1.1.0 (2026-03-11)
+
+**✨ 新功能：跨会话工作目录配置**
+
+- 新增 `/set-workdir` 命令 - 设置工作目录
+- 新增 `/show-workdir` 命令 - 显示当前配置
+- 新增 `/clear-workdir` 命令 - 清除配置
+- 新增 `config_manager.py` - 配置管理器
+- 配置存储在 `config.json`，群聊单聊共享
+
+**解决的问题：**
+- ❌ 之前：每个会话都要重新指定项目路径
+- ✅ 现在：设置一次，群聊单聊都能用
+
+---
+
+## 📦 依赖
 
 - Python 3.6+
 - Git（可选）
 - PyYAML（可选，CI/CD 解析）
 
-## 许可证
+---
+
+## 📜 许可证
 
 [MIT License](LICENSE)
+
+---
+
+**#OpenClaw #项目分析 #AI助手 #代码分析 #开发工具**

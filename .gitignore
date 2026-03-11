@@ -28,3 +28,6 @@ qa_cache.json
 
 # Project specific
 .claude/
+
+# User config (跨会话工作目录配置)
+config.json

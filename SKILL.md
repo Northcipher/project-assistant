@@ -13,6 +13,84 @@ metadata:
 
 你是一个项目的全能助手，能够回答关于项目的任何问题。你的角色可以是项目经理、软件开发工程师、架构师、测试工程师等，根据问题类型自动切换视角。
 
+## 工作目录配置（跨会话共享）
+
+**重要**: 本 skill 支持配置工作目录，配置后可在群聊、单聊等多个场景共享使用。
+
+### 初始化配置（每次触发时执行）
+
+```bash
+# 读取已配置的工作目录
+python3 {baseDir}/scripts/config_manager.py {baseDir} get
+```
+
+返回结果包含 `workdir` 字段，如果已设置工作目录，则在该目录下进行所有项目操作。
+
+### 配置命令
+
+| 命令 | 说明 |
+|------|------|
+| `/set-workdir <路径>` | 设置工作目录，配置后跨会话有效 |
+| `/show-workdir` | 显示当前配置的工作目录 |
+| `/clear-workdir` | 清除工作目录配置 |
+
+---
+
+## /set-workdir (设置工作目录)
+
+设置项目工作目录，配置后可在群聊、单聊等多场景共享使用。
+
+### 使用方式
+
+```
+/set-workdir <目录路径>
+```
+
+### 执行流程
+
+```bash
+# 设置工作目录
+python3 {baseDir}/scripts/config_manager.py {baseDir} set "$TARGET_DIR"
+```
+
+### 示例
+
+```
+用户: /set-workdir /home/user/projects/bk7258
+
+助手:
+✅ 工作目录已设置
+
+目录: /home/user/projects/bk7258
+项目: bk7258
+
+现在可以开始项目问答了，例如：
+- "这个项目的架构是什么？"
+- "如何构建这个项目？"
+```
+
+---
+
+## /show-workdir (显示工作目录)
+
+显示当前配置的工作目录。
+
+```bash
+python3 {baseDir}/scripts/config_manager.py {baseDir} show
+```
+
+---
+
+## /clear-workdir (清除工作目录)
+
+清除工作目录配置。
+
+```bash
+python3 {baseDir}/scripts/config_manager.py {baseDir} clear
+```
+
+---
+
 ## 触发条件
 
 TRIGGER when: 用户询问项目相关问题，如：
@@ -415,9 +493,25 @@ python3 {baseDir}/scripts/utils/cache_manager.py clear "$PROJECT_DIR"
 
 ### Step 1: 确定目标项目
 
-1. 检查当前工作目录是否为有效项目
-2. 如果不明确，询问用户："请指定要分析的项目目录"
-3. 单次会话只管理一个项目
+**优先级顺序**：
+
+1. **配置的工作目录**（跨会话共享，群聊/单聊都可用）
+   ```bash
+   # 检查是否已配置工作目录
+   python3 {baseDir}/scripts/config_manager.py {baseDir} get
+   ```
+   如果返回有效的 `workdir`，则使用该目录作为项目目录。
+
+2. **命令行参数指定的目录**
+   如果用户明确指定了目录（如 `/init /path/to/project`），使用指定目录。
+
+3. **当前工作目录**
+   如果上述都不满足，使用当前工作目录。
+
+4. **询问用户**
+   如果目录不明确，询问用户："请指定要分析的项目目录，或使用 `/set-workdir <路径>` 设置默认工作目录。"
+
+**单次会话只管理一个项目**，但配置的工作目录可以跨会话保持。
 
 ### Step 2: 检查项目文档
 
@@ -1208,6 +1302,12 @@ await payment.process(order);
 ## 工具命令参考
 
 ```bash
+# 配置管理（跨会话工作目录）
+python3 {baseDir}/scripts/config_manager.py {baseDir} get           # 获取工作目录
+python3 {baseDir}/scripts/config_manager.py {baseDir} set ./project # 设置工作目录
+python3 {baseDir}/scripts/config_manager.py {baseDir} show          # 显示配置
+python3 {baseDir}/scripts/config_manager.py {baseDir} clear         # 清除配置
+
 # 项目探测
 python3 {baseDir}/scripts/detector.py ./project
 
@@ -1253,9 +1353,11 @@ python3 {baseDir}/scripts/analyzers/env_scanner.py ./project
 ```
 project-assistant/
 ├── SKILL.md                    # 主入口（本文件）
+├── config.json                 # 工作目录配置（跨会话共享）
 ├── scripts/                    # Python 工具脚本
 │   ├── detector.py             # 项目类型探测器
 │   ├── constants.py            # 统一常量
+│   ├── config_manager.py       # 配置管理器（工作目录等）
 │   ├── parsers/                # 配置文件解析器
 │   ├── analyzers/              # 代码分析器
 │   └── utils/                  # 工具函数

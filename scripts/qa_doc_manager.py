@@ -31,11 +31,50 @@ QA_CATEGORIES = {
 
 # 默认索引结构
 DEFAULT_INDEX = {
-    "version": "1.0",
+    "version": "2.0",
     "entries": [],
+    "inverted_index": {},  # 倒排索引：关键词 -> [entry_id, ...]
     "git_commit": None,
     "updated_at": None
 }
+
+
+def tokenize(text: str) -> List[str]:
+    """分词：提取关键词"""
+    import re
+    # 移除标点，转小写，按空格/中文分词
+    text = text.lower()
+    # 提取中文词和英文词
+    words = re.findall(r'[\u4e00-\u9fff]+|[a-z0-9]+', text)
+    # 过滤停用词
+    stopwords = {'的', '是', '在', '有', '和', '了', '不', '这', '那', '个', '么', '什', '么', '怎', '么', '如', '何'}
+    return [w for w in words if w not in stopwords and len(w) > 1]
+
+
+def build_inverted_index(entries: List[Dict]) -> Dict[str, List[str]]:
+    """构建倒排索引"""
+    index = {}
+    for entry in entries:
+        entry_id = entry.get("id", "")
+        if not entry_id:
+            continue
+
+        # 从问题中提取关键词
+        keywords = set()
+        keywords.update(tokenize(entry.get("question", "")))
+
+        # 从标签中提取
+        for tag in entry.get("tags", []):
+            keywords.update(tokenize(tag))
+
+        # 添加到倒排索引
+        for kw in keywords:
+            if kw not in index:
+                index[kw] = []
+            if entry_id not in index[kw]:
+                index[kw].append(entry_id)
+
+    return index
 
 
 def get_qa_dir(project_dir: str) -> str:
@@ -139,6 +178,8 @@ def save_index(project_dir: str, index: Dict[str, Any]) -> bool:
     try:
         index["updated_at"] = datetime.now().isoformat()
         index["git_commit"] = get_git_commit(project_dir)
+        # 重建倒排索引
+        index["inverted_index"] = build_inverted_index(index["entries"])
         with open(index_path, 'w', encoding='utf-8') as f:
             json.dump(index, f, ensure_ascii=False, indent=2)
         return True
@@ -236,33 +277,35 @@ def create_qa_doc(project_dir: str, question: str, answer: str,
 
 
 def search_qa(project_dir: str, query: str) -> List[Dict[str, Any]]:
-    """搜索问答"""
+    """搜索问答（使用倒排索引加速）"""
     index = load_index(project_dir)
-    results = []
 
+    # 提取查询关键词
+    query_keywords = tokenize(query)
+    if not query_keywords:
+        return []
+
+    # 使用倒排索引查找
+    inverted = index.get("inverted_index", {})
+    entry_scores = {}
+
+    for kw in query_keywords:
+        if kw in inverted:
+            for entry_id in inverted[kw]:
+                entry_scores[entry_id] = entry_scores.get(entry_id, 0) + 1
+
+    # 同时检查问题原文匹配（兜底）
     query_lower = query.lower()
-
     for entry in index["entries"]:
-        score = 0
-
-        # 问题匹配
         if query_lower in entry["question"].lower():
-            score += 10
+            entry_scores[entry["id"]] = entry_scores.get(entry["id"], 0) + 10
 
-        # 标签匹配
-        for tag in entry.get("tags", []):
-            if query_lower in tag.lower():
-                score += 5
-
-        # 分类匹配
-        if query_lower in entry.get("category", "").lower():
-            score += 3
-
-        if score > 0:
-            results.append({
-                **entry,
-                "score": score
-            })
+    # 构建结果
+    id_to_entry = {e["id"]: e for e in index["entries"]}
+    results = []
+    for entry_id, score in entry_scores.items():
+        if entry_id in id_to_entry:
+            results.append({**id_to_entry[entry_id], "score": score})
 
     results.sort(key=lambda x: x["score"], reverse=True)
     return results[:10]

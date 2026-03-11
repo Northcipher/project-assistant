@@ -15,24 +15,38 @@ metadata:
 
 ## 工作目录配置（跨会话共享）
 
-**重要**: 本 skill 支持配置工作目录，配置后可在群聊、单聊等多个场景共享使用。
+**重要**: 本 skill 支持个性化配置，配置后可在群聊、单聊等多个场景共享使用。
 
 ### 初始化配置（每次触发时执行）
 
 ```bash
 # 读取已配置的工作目录
-python3 {baseDir}/scripts/config_manager.py {baseDir} get
+python3 {baseDir}/scripts/config_manager.py {baseDir} get workdir
 ```
 
-返回结果包含 `workdir` 字段，如果已设置工作目录，则在该目录下进行所有项目操作。
+返回结果包含 `value` 字段，如果已设置工作目录，则在该目录下进行所有项目操作。
 
 ### 配置命令
 
 | 命令 | 说明 |
 |------|------|
-| `/set-workdir <路径>` | 设置工作目录，配置后跨会话有效 |
-| `/show-workdir` | 显示当前配置的工作目录 |
-| `/clear-workdir` | 清除工作目录配置 |
+| `/set-workdir <路径>` | 设置工作目录 |
+| `/set-config <key> <value>` | 设置任意配置项 |
+| `/get-config <key>` | 获取配置项 |
+| `/show-config` | 显示所有配置 |
+| `/delete-config <key>` | 删除配置项 |
+
+### 预定义配置项
+
+| 配置项 | 说明 | 示例 |
+|--------|------|------|
+| `workdir` | 工作目录路径 | `/home/user/project` |
+| `build_command` | 构建命令 | `npm run build` |
+| `run_command` | 运行命令 | `npm run dev` |
+| `test_command` | 测试命令 | `npm test` |
+| `preferences.language` | 语言偏好 | `zh` / `en` |
+| `preferences.detail_level` | 详细程度 | `brief` / `normal` / `detailed` |
+| `custom.*` | 自定义配置（任意键值对） | `custom.api_key` |
 
 ---
 
@@ -49,8 +63,7 @@ python3 {baseDir}/scripts/config_manager.py {baseDir} get
 ### 执行流程
 
 ```bash
-# 设置工作目录
-python3 {baseDir}/scripts/config_manager.py {baseDir} set "$TARGET_DIR"
+python3 {baseDir}/scripts/config_manager.py {baseDir} set workdir "$TARGET_DIR"
 ```
 
 ### 示例
@@ -71,22 +84,89 @@ python3 {baseDir}/scripts/config_manager.py {baseDir} set "$TARGET_DIR"
 
 ---
 
-## /show-workdir (显示工作目录)
+## /set-config (设置配置项)
 
-显示当前配置的工作目录。
+设置任意个性化配置项，支持嵌套键。
+
+### 使用方式
+
+```
+/set-config <key> <value>
+```
+
+### 执行流程
+
+```bash
+python3 {baseDir}/scripts/config_manager.py {baseDir} set "$KEY" "$VALUE"
+```
+
+### 示例
+
+```
+用户: /set-config build_command "make all"
+
+助手: ✅ 已设置 build_command = "make all"
+
+用户: /set-config preferences.language zh
+
+助手: ✅ 已设置 preferences.language = "zh"
+
+用户: /set-config custom.board_type bk7258
+
+助手: ✅ 已设置 custom.board_type = "bk7258"
+```
+
+---
+
+## /get-config (获取配置项)
+
+获取指定配置项的值。
+
+```bash
+python3 {baseDir}/scripts/config_manager.py {baseDir} get "$KEY"
+```
+
+---
+
+## /show-config (显示所有配置)
+
+显示当前所有配置。
 
 ```bash
 python3 {baseDir}/scripts/config_manager.py {baseDir} show
 ```
 
+### 示例输出
+
+```json
+{
+  "config": {
+    "workdir": "/home/user/projects/bk7258",
+    "project_name": "bk7258",
+    "build_command": "make all",
+    "run_command": "make flash",
+    "test_command": null,
+    "preferences": {
+      "language": "zh",
+      "detail_level": "detailed"
+    },
+    "custom": {
+      "board_type": "bk7258"
+    }
+  },
+  "created_at": "2026-03-11T10:00:00",
+  "updated_at": "2026-03-11T11:30:00"
+}
+```
+
 ---
 
-## /clear-workdir (清除工作目录)
+## /delete-config (删除配置项)
 
-清除工作目录配置。
+删除指定的配置项。
 
 ```bash
-python3 {baseDir}/scripts/config_manager.py {baseDir} clear
+python3 {baseDir}/scripts/config_manager.py {baseDir} delete "$KEY"
 ```
 
 ---
@@ -498,7 +578,7 @@ python3 {baseDir}/scripts/utils/cache_manager.py clear "$PROJECT_DIR"
 1. **配置的工作目录**（跨会话共享，群聊/单聊都可用）
    ```bash
    # 检查是否已配置工作目录
-   python3 {baseDir}/scripts/config_manager.py {baseDir} get
+   python3 {baseDir}/scripts/config_manager.py {baseDir} get workdir
    ```
    如果返回有效的 `workdir`，则使用该目录作为项目目录。
 
@@ -512,6 +592,19 @@ python3 {baseDir}/scripts/utils/cache_manager.py clear "$PROJECT_DIR"
    如果目录不明确，询问用户："请指定要分析的项目目录，或使用 `/set-workdir <路径>` 设置默认工作目录。"
 
 **单次会话只管理一个项目**，但配置的工作目录可以跨会话保持。
+
+**读取其他配置项**：
+
+```bash
+# 获取构建命令
+python3 {baseDir}/scripts/config_manager.py {baseDir} get build_command
+
+# 获取偏好设置
+python3 {baseDir}/scripts/config_manager.py {baseDir} get preferences.language
+
+# 获取自定义配置
+python3 {baseDir}/scripts/config_manager.py {baseDir} get custom.board_type
+```
 
 ### Step 2: 检查项目文档
 
@@ -1302,11 +1395,14 @@ await payment.process(order);
 ## 工具命令参考
 
 ```bash
-# 配置管理（跨会话工作目录）
-python3 {baseDir}/scripts/config_manager.py {baseDir} get           # 获取工作目录
-python3 {baseDir}/scripts/config_manager.py {baseDir} set ./project # 设置工作目录
-python3 {baseDir}/scripts/config_manager.py {baseDir} show          # 显示配置
-python3 {baseDir}/scripts/config_manager.py {baseDir} clear         # 清除配置
+# 配置管理（跨会话个性化配置）
+python3 {baseDir}/scripts/config_manager.py {baseDir} show              # 显示所有配置
+python3 {baseDir}/scripts/config_manager.py {baseDir} get workdir       # 获取工作目录
+python3 {baseDir}/scripts/config_manager.py {baseDir} set workdir ./project
+python3 {baseDir}/scripts/config_manager.py {baseDir} set build_command "make all"
+python3 {baseDir}/scripts/config_manager.py {baseDir} set preferences.language zh
+python3 {baseDir}/scripts/config_manager.py {baseDir} set custom.board_type bk7258
+python3 {baseDir}/scripts/config_manager.py {baseDir} delete build_command
 
 # 项目探测
 python3 {baseDir}/scripts/detector.py ./project

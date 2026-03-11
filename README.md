@@ -34,22 +34,36 @@
 | 桌面应用 | Qt, Electron, Flutter |
 | 系统编程 | C/C++, Rust, Go |
 
-### 🔥 新功能：跨会话工作目录
+### 🔥 新功能：跨会话个性化配置
 
 **群聊、单聊、不同会话，一个配置全搞定！**
 
 ```
-# 设置一次，到处能用
+# 设置工作目录
 /set-workdir /home/user/projects/my-project
 
-# 群聊里问
-@OpenClaw 这个项目的架构是什么？
+# 设置构建命令
+/set-config build_command "make all"
 
-# 单聊里问
-这个功能怎么实现的？
+# 设置偏好
+/set-config preferences.language zh
+
+# 设置自定义配置
+/set-config custom.board_type bk7258
 ```
 
-再也不用每次都指定路径了 🎉
+**支持任意配置项，你想存什么就存什么！**
+
+| 配置项 | 说明 |
+|--------|------|
+| `workdir` | 工作目录 |
+| `build_command` | 构建命令 |
+| `run_command` | 运行命令 |
+| `test_command` | 测试命令 |
+| `preferences.*` | 偏好设置 |
+| `custom.*` | 任意自定义配置 |
+
+再也不用每次都重复输入了 🎉
 
 ---
 
@@ -235,6 +249,25 @@ project-assistant/
 
 ## 📋 更新日志
 
+### v1.2.0 (2026-03-11)
+
+**✨ 新功能：通用个性化配置系统**
+
+- 重构 `config_manager.py` 支持任意配置项
+- 新增 `/set-config <key> <value>` 命令 - 设置任意配置
+- 新增 `/get-config <key>` 命令 - 获取配置项
+- 新增 `/show-config` 命令 - 显示所有配置
+- 新增 `/delete-config <key>` 命令 - 删除配置项
+- 支持嵌套键，如 `preferences.language`、`custom.board_type`
+
+**预定义配置项：**
+- `workdir` - 工作目录
+- `build_command` - 构建命令
+- `run_command` - 运行命令
+- `test_command` - 测试命令
+- `preferences.*` - 偏好设置
+- `custom.*` - 自定义配置（任意键值对）
+
 ### v1.1.0 (2026-03-11)
 
 **✨ 新功能：跨会话工作目录配置**
@@ -244,6 +277,7 @@ project-assistant/
 - 新增 `/clear-workdir` 命令 - 清除配置
 - 新增 `config_manager.py` - 配置管理器
 - 配置存储在 `config.json`，群聊单聊共享
+- 更新 README 为小红书风格
 
 **解决的问题：**
 - ❌ 之前：每个会话都要重新指定项目路径

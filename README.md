@@ -72,6 +72,7 @@
 | 功能 | 说明 |
 |------|------|
 | 🤖 智能问答 | 自动识别问题类型，精准回答 |
+| 📝 问答沉淀 | 自动生成文档，Git变更检测，过期提醒 ✨ |
 | 🔗 调用链分析 | 支持 7 种语言，函数调用一追到底 |
 | 📡 IPC 分析 | Binder/DBus/gRPC/SOME/IP/Socket |
 | ⚡ 影响分析 | 改代码前就知道会影响谁 |
@@ -98,7 +99,8 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
 /set-workdir /path/to/project    # 设置工作目录（跨会话有效）
 /init                            # 初始化项目
 /init /path/to/project           # 初始化指定项目
-/show-workdir                    # 查看当前工作目录
+/search-qa WiFi                  # 搜索历史问答 ✨
+/check-qa                        # 检查问答文档是否过期 ✨
 ```
 
 ### 示例对话
@@ -114,7 +116,7 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
       [4/4] 生成项目文档... ✓ .claude/project.md
 ```
 
-**智能问答：**
+**智能问答（自动生成文档）：**
 
 ```
 用户: 登录功能是怎么实现的？
@@ -130,6 +132,36 @@ git clone https://github.com/Northcipher/project-assistant.git ~/.claude/skills/
       相关代码：
       - `src/pages/Login.tsx:45-78`
       - `src/api/auth.ts:23-56`
+
+      📝 已生成文档: .claude/docs/qa/feature/20260311_120000_登录功能是怎么实现的.md
+```
+
+**搜索历史问答：**
+
+```
+用户: /search-qa WiFi
+
+助手: 找到 3 条相关问答：
+
+      1. [feature] WiFi怎么连接？| 2026-03-10
+      2. [debug] WiFi连接失败怎么办？| 2026-03-11
+      3. [api] WiFi API 接口说明 | 2026-03-09
+```
+
+**检查文档过期：**
+
+```
+用户: /check-qa
+
+助手: 📋 文档检查结果：
+
+      当前提交: 1e5c122
+      过期文档: 2 条
+
+      1. "WiFi怎么连接？" - 相关文件已修改
+      2. "构建流程是什么？" - 代码有新提交
+
+      建议重新询问这些问题以更新文档。
 ```
 
 **影响分析：**
@@ -248,6 +280,26 @@ project-assistant/
 ---
 
 ## 📋 更新日志
+
+### v1.3.0 (2026-03-11)
+
+**✨ 新功能：问答文档沉淀系统**
+
+- 新增 `qa_doc_manager.py` - 问答文档管理器
+- 回答完成后自动生成 Markdown 文档
+- 按 8 种分类自动归档（架构、构建、功能、调试等）
+- 记录 Git commit hash，支持过期检测
+- 记录相关文件哈希，代码变更时提醒
+
+**新增命令：**
+- `/search-qa <关键词>` - 搜索历史问答
+- `/list-qa [分类]` - 列出问答文档
+- `/check-qa` - 检查文档是否过期
+- `/delete-qa <id>` - 删除问答文档
+
+**解决的问题：**
+- ❌ 之前：问过的问题下次还要重新问
+- ✅ 现在：自动沉淀成文档，新人可以直接查
 
 ### v1.2.0 (2026-03-11)
 

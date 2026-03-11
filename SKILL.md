@@ -171,6 +171,129 @@ python3 {baseDir}/scripts/config_manager.py {baseDir} delete "$KEY"
 
 ---
 
+## 问答文档沉淀
+
+**重要**: 回答完成后自动生成文档，沉淀项目知识，方便后续人员查阅。
+
+### 文档结构
+
+```
+项目目录/.claude/
+├── index/
+│   └── qa_index.json       # 问答索引
+└── docs/qa/                # 问答文档目录
+    ├── architecture/       # 架构设计类
+    ├── build/              # 构建配置类
+    ├── feature/            # 功能实现类
+    ├── debug/              # 问题调试类
+    ├── api/                # 接口说明类
+    ├── module/             # 模块说明类
+    ├── process/            # 流程说明类
+    └── other/              # 其他
+```
+
+### 文档过期检测
+
+每次查询问答时，自动检查：
+
+1. **Git Commit 变化** - 代码有新提交时标记过期
+2. **文件哈希变化** - 相关文件被修改时标记过期
+
+过期文档会提示用户，可选择重新生成。
+
+### 命令
+
+| 命令 | 说明 |
+|------|------|
+| `/search-qa <关键词>` | 搜索历史问答 |
+| `/list-qa [分类]` | 列出问答文档 |
+| `/check-qa` | 检查文档是否过期 |
+| `/delete-qa <id>` | 删除问答文档 |
+
+---
+
+## /search-qa (搜索问答)
+
+搜索历史问答文档。
+
+```bash
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" search "$QUERY"
+```
+
+### 示例
+
+```
+用户: /search-qa WiFi
+
+助手: 找到 3 条相关问答：
+
+1. [feature] WiFi怎么连接？
+   创建: 2026-03-10 | 文件: src/wifi.c
+
+2. [debug] WiFi连接失败怎么办？
+   创建: 2026-03-11 | 文件: src/wifi.c, src/config.c
+
+3. [api] WiFi API 接口说明
+   创建: 2026-03-09 | 文件: include/wifi.h
+```
+
+---
+
+## /list-qa (列出问答)
+
+列出所有问答文档。
+
+```bash
+# 列出所有
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" list
+
+# 按分类列出
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" list architecture
+```
+
+---
+
+## /check-qa (检查过期)
+
+检查问答文档是否因代码变更而过期。
+
+```bash
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" check
+```
+
+### 示例输出
+
+```json
+{
+  "current_commit": "1e5c122",
+  "outdated_count": 2,
+  "outdated": [
+    {
+      "id": "a1b2c3d4",
+      "question": "WiFi怎么连接？",
+      "reasons": ["相关文件已修改"]
+    },
+    {
+      "id": "e5f6g7h8",
+      "question": "构建流程是什么？",
+      "reasons": ["代码有新提交"]
+    }
+  ]
+}
+```
+
+---
+
+## /delete-qa (删除问答)
+
+删除指定的问答文档。
+
+```bash
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" delete "$ENTRY_ID"
+```
+
+---
+
 ## 触发条件
 
 TRIGGER when: 用户询问项目相关问题，如：
@@ -839,7 +962,52 @@ python3 {baseDir}/scripts/utils/qa_cache.py set "$PROJECT_DIR" "$QUESTION" "$ANS
 - 完整答案
 - 涉及的文件引用（用于失效判断）
 
-### Step 9: 调用链分析
+### Step 9: 生成问答文档
+
+将问答沉淀为文档，方便后续查阅：
+
+```bash
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" create "$QUESTION" "$ANSWER" "$FILE_REFS" "$TAGS"
+```
+
+**文档特点**：
+- 按问题类型自动分类（架构、构建、功能、调试等）
+- 记录创建时的 Git commit hash
+- 记录相关文件哈希，用于过期检测
+- 生成可读的 Markdown 文档
+
+**示例文档**：
+
+```markdown
+# WiFi怎么连接？
+
+> 分类: 功能实现
+> 创建时间: 2026-03-11 12:00
+> Git Commit: 1e5c122
+
+## 问题
+
+WiFi怎么连接？
+
+## 回答
+
+使用 `wifi_connect()` 函数连接 WiFi：
+
+1. 调用 `wifi_init()` 初始化
+2. 调用 `wifi_connect(ssid, password)` 连接
+3. 等待 `WIFI_EVENT_CONNECTED` 事件
+
+## 相关文件
+
+- `src/wifi/wifi.c`
+- `include/wifi.h`
+
+## 标签
+
+#wifi #network #连接
+```
+
+### Step 10: 调用链分析
 
 对于代码相关问题，分析调用链：
 
@@ -1404,6 +1572,14 @@ python3 {baseDir}/scripts/config_manager.py {baseDir} set preferences.language z
 python3 {baseDir}/scripts/config_manager.py {baseDir} set custom.board_type bk7258
 python3 {baseDir}/scripts/config_manager.py {baseDir} delete build_command
 
+# 问答文档管理
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" search "WiFi"           # 搜索问答
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" list                    # 列出所有问答
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" list architecture      # 按分类列出
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" check                  # 检查文档过期
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" create "问题" "答案" "文件" "标签"
+python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" delete <entry_id>
+
 # 项目探测
 python3 {baseDir}/scripts/detector.py ./project
 
@@ -1454,6 +1630,7 @@ project-assistant/
 │   ├── detector.py             # 项目类型探测器
 │   ├── constants.py            # 统一常量
 │   ├── config_manager.py       # 配置管理器（工作目录等）
+│   ├── qa_doc_manager.py       # 问答文档管理器 ✨新增
 │   ├── parsers/                # 配置文件解析器
 │   ├── analyzers/              # 代码分析器
 │   └── utils/                  # 工具函数
@@ -1467,6 +1644,33 @@ project-assistant/
 ├── tests/                      # 测试套件
 ├── README.md                   # 项目说明
 └── LICENSE                     # MIT 许可证
+```
+
+**项目文档结构**（在目标项目中生成）：
+
+```
+项目目录/.claude/
+├── project.md              # 项目概览
+├── config.json             # 项目配置
+├── cache.json              # 分析缓存
+├── qa_cache.json           # Q&A 缓存
+├── index/                  # 索引目录
+│   ├── processes.json      # 进程索引
+│   ├── ipc.json            # IPC 索引
+│   ├── structure.json      # 结构索引
+│   └── qa_index.json       # 问答索引 ✨新增
+└── docs/                   # 文档目录
+    ├── subsystems/         # 子系统文档
+    ├── ipc/                # IPC 文档
+    └── qa/                 # 问答文档 ✨新增
+        ├── architecture/   # 架构类
+        ├── build/          # 构建类
+        ├── feature/        # 功能类
+        ├── debug/          # 调试类
+        ├── api/            # 接口类
+        ├── module/         # 模块类
+        ├── process/        # 流程类
+        └── other/          # 其他
 ```
 
 ---

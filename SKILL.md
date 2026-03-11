@@ -294,6 +294,198 @@ python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" delete "$ENTRY_ID"
 
 ---
 
+## 飞书文档集成
+
+**重要**: 与飞书 Skill 协作，生成文档更新建议（不直接修改文档）。
+
+### 协作流程
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  分析项目变更   │ ──▶ │  生成更新建议   │ ──▶ │  用户确认执行   │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+                                                ┌─────────────────┐
+                                                │   飞书 Skill    │
+                                                │  执行文档更新   │
+                                                └─────────────────┘
+```
+
+### 配置飞书文档
+
+```bash
+# 配置飞书文档信息
+/set-config feishu.doc_token "doccnxxxxxx"        # 文档 token
+/set-config feishu.folder_token "fldcnxxxxxx"     # 文件夹 token
+/set-config feishu.wiki_token "wikcnxxxxxx"       # 知识库 token
+/set-config feishu.doc_url "https://xxx.feishu.cn/docx/xxx"
+```
+
+### 命令
+
+| 命令 | 说明 |
+|------|------|
+| `/feishu-report` | 生成飞书文档更新建议报告 |
+| `/feishu-status` | 检查文档同步状态 |
+| `/feishu-suggest <file> <type>` | 生成单个文件的文档建议 |
+
+---
+
+## /feishu-report (生成更新报告)
+
+生成飞书友好的文档更新建议报告。
+
+```bash
+python3 {baseDir}/scripts/feishu_doc_manager.py "$PROJECT_DIR" report
+```
+
+### 报告内容
+
+- 📊 变更概览（最近提交、变更文件）
+- 🔴 高优先级更新（API 变更等）
+- 🟡 中优先级更新（模块变更、配置变更）
+- 🟢 低优先级更新（文档更新）
+- 🚀 执行更新的命令指南
+
+### 示例输出
+
+```markdown
+# 📋 飞书文档更新建议报告
+
+> 生成时间: 2026-03-11 14:00
+> 变更文件数: 5
+
+## 🔴 高优先级更新 (2 项)
+
+### API 变更
+
+**文件**: `src/api/user.py`
+**文档章节**: API 接口文档
+**建议**: API 文件有变更，建议更新 API 文档
+
+---
+
+## 🚀 执行更新
+
+### 方式一：追加到文档末尾
+
+feishu_doc_update append --doc_token "doccnxxxxxx"
+```
+```
+
+---
+
+## /feishu-status (检查同步状态)
+
+检查项目代码与飞书文档的同步状态。
+
+```bash
+python3 {baseDir}/scripts/feishu_doc_manager.py "$PROJECT_DIR" status
+```
+
+### 示例输出
+
+```json
+{
+  "status": "need_update",
+  "status_text": "🔴 需要更新",
+  "changed_files": 5,
+  "high_priority": 2,
+  "medium_priority": 2,
+  "low_priority": 1
+}
+```
+
+### 状态说明
+
+| 状态 | 说明 |
+|------|------|
+| `synced` | ✅ 已同步 |
+| `minor_update` | 🟢 可选更新 |
+| `suggest_update` | 🟡 建议更新 |
+| `need_update` | 🔴 需要更新 |
+
+---
+
+## /feishu-suggest (生成文档建议)
+
+为单个文件生成飞书文档内容建议。
+
+```bash
+python3 {baseDir}/scripts/feishu_doc_manager.py "$PROJECT_DIR" suggest "$FILE_PATH" "$CHANGE_TYPE"
+```
+
+### 变更类型
+
+| 类型 | 说明 |
+|------|------|
+| `api_added` | 新增 API |
+| `api_modified` | API 变更 |
+| `module_added` | 新增模块 |
+
+### 示例
+
+```
+用户: /feishu-suggest src/api/user.py api_added
+
+助手: ## 新增接口: user.py
+
+      ### 接口说明
+      <!-- 请填写接口用途 -->
+
+      ### 请求方式
+      - Method: `POST/GET`
+      - Path: `/api/xxx`
+
+      ### 请求参数
+      | 参数 | 类型 | 必填 | 说明 |
+      |------|------|------|------|
+      | | | | |
+
+      ### 返回示例
+      ```json
+      {
+        "code": 0,
+        "data": {}
+      }
+      ```
+```
+
+---
+
+## 飞书 Skill 协作指南
+
+### 1. 获取现有文档
+
+```
+用户: 获取飞书文档内容
+助手: [调用 feishu_doc_fetch]
+```
+
+### 2. 生成更新建议
+
+```
+用户: /feishu-report
+助手: [生成更新建议报告]
+```
+
+### 3. 用户确认后执行
+
+```
+用户: 将建议追加到飞书文档
+助手: [调用 feishu_doc_update append]
+```
+
+### 4. 创建任务提醒
+
+```
+用户: 创建文档更新任务
+助手: [调用 feishu_task_task create]
+```
+
+---
+
 ## 触发条件
 
 TRIGGER when: 用户询问项目相关问题，如：
@@ -1580,6 +1772,12 @@ python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" check                
 python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" create "问题" "答案" "文件" "标签"
 python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" delete <entry_id>
 
+# 飞书文档集成（与飞书 Skill 协作）
+python3 {baseDir}/scripts/feishu_doc_manager.py "$PROJECT_DIR" report              # 生成更新建议报告
+python3 {baseDir}/scripts/feishu_doc_manager.py "$PROJECT_DIR" status              # 检查同步状态
+python3 {baseDir}/scripts/feishu_doc_manager.py "$PROJECT_DIR" suggest "file" "type"  # 生成文档建议
+python3 {baseDir}/scripts/config_manager.py {baseDir} set feishu.doc_token "xxx"   # 配置文档token
+
 # 项目探测
 python3 {baseDir}/scripts/detector.py ./project
 
@@ -1630,7 +1828,8 @@ project-assistant/
 │   ├── detector.py             # 项目类型探测器
 │   ├── constants.py            # 统一常量
 │   ├── config_manager.py       # 配置管理器（工作目录等）
-│   ├── qa_doc_manager.py       # 问答文档管理器 ✨新增
+│   ├── qa_doc_manager.py       # 问答文档管理器
+│   ├── feishu_doc_manager.py   # 飞书文档管理器 ✨新增
 │   ├── parsers/                # 配置文件解析器
 │   ├── analyzers/              # 代码分析器
 │   └── utils/                  # 工具函数

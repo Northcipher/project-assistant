@@ -47,6 +47,14 @@ TRIGGER when: 用户询问项目相关问题：
 | `/show-config` | 显示所有配置 | - |
 | `/delete-config <key>` | 删除配置项 | - |
 
+**CLI 命令**：
+```bash
+python3 {baseDir}/scripts/cli.py config set workdir /path/to/project
+python3 {baseDir}/scripts/cli.py config get workdir
+python3 {baseDir}/scripts/cli.py config show
+python3 {baseDir}/scripts/cli.py config delete workdir
+```
+
 ### 项目初始化
 
 | 命令 | 说明 | 详细指南 |
@@ -57,10 +65,31 @@ TRIGGER when: 用户询问项目相关问题：
 
 | 命令 | 说明 | 详细指南 |
 |------|------|---------|
-| `/search-qa <关键词>` | 搜索历史问答 | `{baseDir}/references/guides/qa.md` |
+| `/qa [问题] [答案]` | 记录问答（智能模式） | `{baseDir}/references/guides/qa.md` |
+| `/search-qa <关键词>` | 搜索历史问答 | - |
 | `/list-qa [分类]` | 列出问答文档 | - |
 | `/check-qa` | 检查文档过期 | - |
 | `/delete-qa <id>` | 删除问答文档 | - |
+
+**智能记录模式**：
+- 无参数调用 `/qa`：记录最近一次问答
+- 只提供问题：Claude 自动提取答案
+- 完整参数：直接创建文档
+
+**CLI 命令**：
+```bash
+# 列出所有问答
+python3 {baseDir}/scripts/cli.py qa --list
+
+# 检查过期问答
+python3 {baseDir}/scripts/cli.py qa --check
+
+# 删除问答
+python3 {baseDir}/scripts/cli.py qa --delete <qa_id>
+
+# 搜索问答
+python3 {baseDir}/scripts/cli.py qa --search "关键词"
+```
 
 ### 飞书集成
 
@@ -97,6 +126,21 @@ TRIGGER when: 用户询问项目相关问题：
 | `/diagram dependency` | 依赖图 | Mermaid |
 | `/diagram class [类名]` | 类图 | Mermaid |
 
+**CLI 命令**：
+```bash
+# 架构图
+python3 {baseDir}/scripts/cli.py diagram architecture .
+
+# 时序图（指定函数）
+python3 {baseDir}/scripts/cli.py diagram sequence . --function main
+
+# 类图（指定类名）
+python3 {baseDir}/scripts/cli.py diagram class . --class-name User
+
+# 依赖图
+python3 {baseDir}/scripts/cli.py diagram dependency .
+```
+
 ### 知识图谱
 
 | 命令 | 说明 |
@@ -105,94 +149,60 @@ TRIGGER when: 用户询问项目相关问题：
 | `/kg-outdated` | 检查过期问答 |
 | `/kg-related <文件>` | 获取相关问答 |
 
+### 缓存管理
+
+| 命令 | 说明 |
+|------|------|
+| `/cache check` | 检查缓存有效性 |
+| `/cache update` | 更新缓存 |
+| `/cache clear` | 清除缓存 |
+| `/cache info` | 查看缓存信息 |
+
+**CLI 命令**：
+```bash
+python3 {baseDir}/scripts/cli.py cache check
+python3 {baseDir}/scripts/cli.py cache update
+python3 {baseDir}/scripts/cli.py cache info
+```
+
 ---
 
 ## 执行流程
 
-### Step 0: 安全检查（可选）
+### Step 0: 安全检查（首次初始化时自动执行）
 
-**首次分析前**执行敏感信息扫描：
-
-```bash
-# 扫描敏感信息
-python3 {baseDir}/scripts/security/sensitive_scanner.py "$PROJECT_DIR"
-
-# 发现敏感信息时的处理：
-# 1. 警告用户并建议排除
-# 2. 自动脱敏后继续分析
-# 3. 记录审计日志
-```
-
-### Step 1: 确定项目目录（REQUIRED）
+首次 `/init` 时自动执行敏感信息扫描：
 
 ```bash
-# 读取配置的工作目录
-python3 {baseDir}/scripts/config_manager.py {baseDir} get workdir
+python3 {baseDir}/scripts/cli.py scan-security "$PROJECT_DIR"
 ```
+
+⚠️ **安全扫描策略**：
+- **首次 `/init`**：强制执行
+- **后续分析**：可选执行
+- **发现敏感信息**：自动脱敏或警告排除
+
+### Step 1: 确定项目目录
 
 优先级：命令行参数 > 配置的 workdir > 当前目录
 
-### Step 2: 检查项目文档（REQUIRED）
-
-**必须**检查 `$PROJECT_DIR/.projmeta/project.md` 是否存在。
-
 ```bash
-# 检查文档是否存在
-if [ ! -f "$PROJECT_DIR/.projmeta/project.md" ]; then
-    # 不存在则调用 /init 生成
-    # 详见 references/guides/init.md
-fi
+python3 {baseDir}/scripts/cli.py config get workdir
 ```
 
-⚠️ **输出路径强制要求**：
-- **唯一正确路径**: `$PROJECT_DIR/.projmeta/project.md`
-- **禁止**输出到项目根目录
-- **禁止**输出到其他任意位置
+### Step 2: 检查项目文档
 
-### Step 3: 智能缓存检查（REQUIRED）
+检查 `$PROJECT_DIR/.projmeta/project.md` 是否存在，不存在则调用 `/init`。
 
-根据问题类型决定缓存检查策略：
-
-| 问题类型 | 检查策略 | 原因 |
-|---------|---------|------|
-| LOCATION | 跳过 | 直接搜索即可 |
-| CONFIG | 快速 | 只检查时间戳 |
-| ARCHITECTURE | 完整 | 需要最新数据 |
-| IMPACT | 强制 | 必须最新 |
+### Step 3: 搜索历史问答
 
 ```bash
-python3 {baseDir}/scripts/utils/cache_manager.py check "$PROJECT_DIR" --quick
-```
-
-**增量更新**：检测 Git 变更，只更新变更部分
-
-```bash
-# 获取变更文件
-python3 {baseDir}/scripts/utils/git_watcher.py "$PROJECT_DIR" changes
-
-# 增量更新缓存
-python3 {baseDir}/scripts/utils/cache_manager.py incremental "$PROJECT_DIR"
-```
-
-### Step 4: 搜索历史问答（REQUIRED）
-
-```bash
-python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" search "$QUERY"
+python3 {baseDir}/scripts/cli.py search-qa "$QUERY"
 ```
 
 **语义增强**：使用 BM25 + 中文分词，提升匹配准确率
 
-```bash
-# 语义相似度搜索（更精准）
-python3 {baseDir}/scripts/utils/qa_cache.py get "$PROJECT_DIR" "$QUERY"
-```
-
-匹配策略：
-- 精确匹配：问题原文包含关键词
-- 语义匹配：BM25 算法计算相似度
-- 意图匹配：问题类型（LOCATION/EXPLAIN/MODIFY）加分
-
-### Step 5: 分析并回答
+### Step 4: 分析并回答
 
 根据问题意图选择回答策略：
 
@@ -203,22 +213,47 @@ python3 {baseDir}/scripts/utils/qa_cache.py get "$PROJECT_DIR" "$QUERY"
 | MODIFY | 如何修改 | 步骤指导 |
 | IMPACT | 影响什么 | 影响树 |
 
-### Step 6: 沉淀问答文档（REQUIRED）
+### Step 5: 自动记录问答
 
+**自动判断标准**：满足以下任一条件即自动记录
+
+| 条件 | 示例 |
+|------|------|
+| 回答涉及代码文件 | "这个功能在 src/auth.py 实现" |
+| 回答包含流程步骤 | "构建步骤：1. xxx 2. xxx" |
+| 回答涉及架构设计 | "系统采用分层架构..." |
+| 问题包含"怎么""如何""为什么" | "怎么实现登录？" |
+
+**自动执行**：
 ```bash
-python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" create "$QUESTION" "$ANSWER" "$FILES" "$TAGS"
+python3 {baseDir}/scripts/cli.py qa --auto
 ```
 
-### Step 7: 知识图谱关联（可选）
+---
 
-将问答与代码、测试关联，支持后续智能推荐：
+## 内部优化（透明执行）
+
+以下步骤由系统自动完成，用户无需关心：
+
+### 缓存管理
+
+项目分析结果自动缓存，变更时增量更新：
 
 ```bash
-# 关联问答与代码文件
-python3 {baseDir}/scripts/knowledge_graph.py "$PROJECT_DIR" link "$QA_ID" "$FILE_PATHS"
+# 手动检查缓存（可选）
+python3 {baseDir}/scripts/cli.py cache check
 
-# 记录审计日志
-python3 {baseDir}/scripts/security/audit_logger.py "$PROJECT_DIR" log "qa_create" "$QA_ID"
+# 更新缓存（可选）
+python3 {baseDir}/scripts/cli.py cache update
+```
+
+### 知识图谱关联
+
+问答与代码自动关联，支持智能推荐：
+
+```bash
+# 查看相关问答
+python3 {baseDir}/scripts/cli.py kg related --file "$FILE"
 ```
 
 ---
@@ -278,7 +313,9 @@ python3 {baseDir}/scripts/cli.py parse-ast --project "$PROJECT_DIR"
 
 # 图表生成
 python3 {baseDir}/scripts/cli.py diagram architecture "$PROJECT_DIR"
+python3 {baseDir}/scripts/cli.py diagram sequence "$PROJECT_DIR" --function main
 python3 {baseDir}/scripts/cli.py diagram dependency "$PROJECT_DIR"
+python3 {baseDir}/scripts/cli.py diagram class "$PROJECT_DIR" --class-name User
 
 # 知识图谱
 python3 {baseDir}/scripts/cli.py kg outdated "$PROJECT_DIR"
@@ -287,82 +324,31 @@ python3 {baseDir}/scripts/cli.py kg related "$PROJECT_DIR" --file "$FILE"
 # 搜索问答（语义匹配）
 python3 {baseDir}/scripts/cli.py search-qa "$QUERY" "$PROJECT_DIR"
 
-# 审计日志
-python3 {baseDir}/scripts/cli.py audit-log "$PROJECT_DIR" --limit 20
-```
-
-### 独立脚本调用
-
-```bash
-# 配置管理
-python3 {baseDir}/scripts/config_manager.py {baseDir} <get|set|delete|show> [args]
-
-# 项目探测
-python3 {baseDir}/scripts/detector.py "$PROJECT_DIR"
-
-# 问答文档
-python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" <search|list|check|create|delete> [args]
-
-# 飞书集成
-python3 {baseDir}/scripts/feishu_doc_manager.py "$PROJECT_DIR" <report|status|suggest> [args]
+# 记录问答
+python3 {baseDir}/scripts/cli.py qa "$PROJECT_DIR" --question "$QUESTION" --answer "$ANSWER"
+python3 {baseDir}/scripts/cli.py qa "$PROJECT_DIR" --auto  # 自动记录最近问答
 
 # 缓存管理
-python3 {baseDir}/scripts/utils/cache_manager.py <check|update|clear> "$PROJECT_DIR"
-
-# 调用链分析
-python3 {baseDir}/scripts/utils/call_chain_analyzer.py "$PROJECT_DIR" "$FUNCTION" --impact
-
-# 输出校验（MUST）
-python3 {baseDir}/scripts/validate_output.py "$PROJECT_DIR"
-
-# 安全扫描
-python3 {baseDir}/scripts/security/sensitive_scanner.py "$PROJECT_DIR" [--mask]
+python3 {baseDir}/scripts/cli.py cache check "$PROJECT_DIR"
+python3 {baseDir}/scripts/cli.py cache update "$PROJECT_DIR"
 
 # 审计日志
-python3 {baseDir}/scripts/security/audit_logger.py "$PROJECT_DIR" tail [limit]
-
-# 文件监控
-python3 {baseDir}/scripts/watcher.py "$PROJECT_DIR" [--daemon]
-
-# Git 变更检测
-python3 {baseDir}/scripts/utils/git_watcher.py "$PROJECT_DIR" changes
-
-# 依赖分析
-python3 {baseDir}/scripts/dependency_analyzer.py "$PROJECT_DIR"
-
-# 代码质量分析
-python3 {baseDir}/scripts/ai_analyzer.py "$PROJECT_DIR" --project
-python3 {baseDir}/scripts/ai_analyzer.py "$FILE"  # 单文件分析
-
-# AST 解析
-python3 {baseDir}/scripts/ast_parser.py parse "$FILE"
-python3 {baseDir}/scripts/ast_parser.py project "$PROJECT_DIR"
-
-# 图表生成
-python3 {baseDir}/scripts/diagram_generator.py architecture "$PROJECT_DIR"
-python3 {baseDir}/scripts/diagram_generator.py sequence "$CALL_CHAIN.json"
-python3 {baseDir}/scripts/diagram_generator.py dependency "$DEPS.json"
-
-# 知识图谱
-python3 {baseDir}/scripts/knowledge_graph.py "$PROJECT_DIR" <link|outdated|related> [args]
-
-# 语义相似度（BM25）
-python3 {baseDir}/scripts/utils/qa_cache.py search "$PROJECT_DIR" "$QUERY"
+python3 {baseDir}/scripts/cli.py audit-log "$PROJECT_DIR" --limit 20
 ```
 
 ---
 
 ## 子模块索引
 
-按需加载详细指南：
+按需加载详细指南，**触发条件**明确如下：
 
-| 模块 | 路径 | 内容 |
-|------|------|------|
-| 配置管理 | `{baseDir}/references/guides/config.md` | 配置项详细说明 |
-| 项目初始化 | `{baseDir}/references/guides/init.md` | 初始化流程详解 |
-| 问答文档 | `{baseDir}/references/guides/qa.md` | 问答功能详解 |
-| 飞书集成 | `{baseDir}/references/guides/feishu.md` | 飞书协作详解 |
-| 示例对话 | `{baseDir}/references/guides/examples.md` | 完整示例 |
+| 模块 | 路径 | 触发条件 |
+|------|------|---------|
+| 配置管理 | `{baseDir}/references/guides/config.md` | 使用 `/set-config`、`/get-config`、`/show-config` 时 |
+| 项目初始化 | `{baseDir}/references/guides/init.md` | 首次 `/init` 或需要了解初始化流程时 |
+| 问答文档 | `{baseDir}/references/guides/qa.md` | 使用 `/qa`、`/search-qa`、`/list-qa` 时 |
+| 飞书集成 | `{baseDir}/references/guides/feishu.md` | 使用 `/feishu-report`、`/feishu-status` 时 |
+| 示例对话 | `{baseDir}/references/guides/examples.md` | 需要参考完整使用示例时 |
 
 ---
 

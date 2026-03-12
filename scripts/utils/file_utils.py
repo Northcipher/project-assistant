@@ -232,7 +232,7 @@ def _generate_full_project_md(data: Dict[str, Any]) -> str:
 
 def write_project_md(target_dir: str, content: str) -> str:
     """写入项目文档"""
-    output_dir = os.path.join(target_dir, '.claude')
+    output_dir = os.path.join(target_dir, '.projmeta')
     os.makedirs(output_dir, exist_ok=True)
 
     output_path = os.path.join(output_dir, 'project.md')
@@ -245,7 +245,7 @@ def write_project_md(target_dir: str, content: str) -> str:
 
 def read_project_md(target_dir: str) -> Optional[str]:
     """读取项目文档"""
-    output_path = os.path.join(target_dir, '.claude', 'project.md')
+    output_path = os.path.join(target_dir, '.projmeta', 'project.md')
     if os.path.exists(output_path):
         with open(output_path, 'r', encoding='utf-8') as f:
             return f.read()

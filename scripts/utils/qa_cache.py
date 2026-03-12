@@ -5,9 +5,10 @@
 
 特性：
 - 问题规范化（去除无关词、统一表述）
-- 相似问题匹配
+- 语义相似度匹配（BM25 + TF-IDF）
 - 答案缓存和检索
 - 过期清理
+- 中文分词支持
 """
 
 import os
@@ -70,7 +71,7 @@ class QACacheManager:
     def __init__(self, project_dir: str, ttl_days: int = 7):
         self.project_dir = Path(project_dir).resolve()
         self.ttl_days = ttl_days
-        self._cache_path = self.project_dir / '.claude' / 'qa_cache.json'
+        self._cache_path = self.project_dir / '.projmeta' / 'qa_cache.json'
         self._cache: Dict[str, QACacheEntry] = {}
         self._dirty = False
 
@@ -350,6 +351,199 @@ class QACacheManager:
         self._cache = {}
         self._dirty = True
         self._save()
+
+
+class SemanticMatcher:
+    """语义相似度匹配器
+
+    使用 BM25 + TF-IDF 算法进行语义匹配
+    支持中文分词（jieba）
+    """
+
+    def __init__(self, use_jieba: bool = True):
+        """初始化匹配器
+
+        Args:
+            use_jieba: 是否使用结巴分词（中文）
+        """
+        self.use_jieba = use_jieba
+        self._jieba_available = False
+        self._bm25_available = False
+
+        if use_jieba:
+            try:
+                import jieba
+                self._jieba_available = True
+                # 添加技术词汇到词典
+                tech_words = [
+                    '函数', '方法', '类', '接口', '模块', '组件',
+                    '变量', '参数', '返回值', '调用', '继承',
+                    '实现', '导入', '导出', '依赖', '配置',
+                    '初始化', '构造', '析构', '回调', '异步',
+                    '同步', '线程', '进程', '锁', '队列',
+                    '缓存', '数据库', 'API', 'SDK', '框架',
+                    '构建', '编译', '调试', '测试', '部署',
+                ]
+                for word in tech_words:
+                    jieba.add_word(word)
+            except ImportError:
+                pass
+
+        try:
+            from rank_bm25 import BM25Okapi
+            self._bm25_available = True
+        except ImportError:
+            pass
+
+        # 文档集合
+        self._documents: List[str] = []
+        self._doc_tokens: List[List[str]] = []
+        self._bm25_index = None
+
+    def tokenize(self, text: str) -> List[str]:
+        """分词
+
+        Args:
+            text: 输入文本
+
+        Returns:
+            分词结果
+        """
+        if self._jieba_available:
+            import jieba
+            # 使用结巴分词
+            tokens = list(jieba.cut(text.lower()))
+            # 过滤停用词和标点
+            stop_words = {'的', '了', '是', '在', '有', '和', '与', '或', '这', '那',
+                         '个', '些', '到', '把', '被', '让', '给', '对', '为'}
+            tokens = [t for t in tokens if t.strip() and t not in stop_words
+                     and not t.isspace() and len(t) > 0]
+            return tokens
+        else:
+            # 简单分词（按空格和标点）
+            import re
+            tokens = re.findall(r'[\w\u4e00-\u9fff]+', text.lower())
+            return tokens
+
+    def build_index(self, documents: List[str]) -> None:
+        """构建 BM25 索引
+
+        Args:
+            documents: 文档列表
+        """
+        self._documents = documents
+        self._doc_tokens = [self.tokenize(doc) for doc in documents]
+
+        if self._bm25_available and documents:
+            from rank_bm25 import BM25Okapi
+            self._bm25_index = BM25Okapi(self._doc_tokens)
+        else:
+            self._bm25_index = None
+
+    def search(self, query: str, top_k: int = 5) -> List[Tuple[int, float]]:
+        """搜索相似文档
+
+        Args:
+            query: 查询文本
+            top_k: 返回数量
+
+        Returns:
+            [(doc_index, score), ...]
+        """
+        if not self._documents:
+            return []
+
+        query_tokens = self.tokenize(query)
+
+        if self._bm25_available and self._bm25_index:
+            # 使用 BM25
+            scores = self._bm25_index.get_scores(query_tokens)
+            ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+            return ranked[:top_k]
+        else:
+            # 回退到 TF-IDF
+            return self._tfidf_search(query_tokens, top_k)
+
+    def _tfidf_search(self, query_tokens: List[str], top_k: int) -> List[Tuple[int, float]]:
+        """TF-IDF 搜索（回退方案）"""
+        from collections import Counter
+        import math
+
+        # 计算 IDF
+        doc_count = len(self._documents)
+        df = Counter()
+        for tokens in self._doc_tokens:
+            unique_tokens = set(tokens)
+            for token in unique_tokens:
+                df[token] += 1
+
+        # 计算查询向量
+        query_tf = Counter(query_tokens)
+        query_vec = {}
+        for token, tf in query_tf.items():
+            idf = math.log(doc_count / (df.get(token, 0) + 1))
+            query_vec[token] = tf * idf
+
+        # 计算相似度
+        scores = []
+        for i, doc_tokens in enumerate(self._doc_tokens):
+            doc_tf = Counter(doc_tokens)
+            doc_vec = {}
+            for token, tf in doc_tf.items():
+                idf = math.log(doc_count / (df.get(token, 0) + 1))
+                doc_vec[token] = tf * idf
+
+            # 余弦相似度
+            dot_product = sum(query_vec.get(t, 0) * doc_vec.get(t, 0) for t in set(query_vec) | set(doc_vec))
+            query_norm = math.sqrt(sum(v ** 2 for v in query_vec.values())) if query_vec else 0
+            doc_norm = math.sqrt(sum(v ** 2 for v in doc_vec.values())) if doc_vec else 0
+
+            if query_norm > 0 and doc_norm > 0:
+                similarity = dot_product / (query_norm * doc_norm)
+            else:
+                similarity = 0
+
+            scores.append((i, similarity))
+
+        scores.sort(key=lambda x: x[1], reverse=True)
+        return scores[:top_k]
+
+    def calculate_similarity(self, text1: str, text2: str) -> float:
+        """计算两段文本的相似度
+
+        Args:
+            text1: 文本1
+            text2: 文本2
+
+        Returns:
+            相似度分数 (0-1)
+        """
+        tokens1 = self.tokenize(text1)
+        tokens2 = self.tokenize(text2)
+
+        if not tokens1 or not tokens2:
+            return 0.0
+
+        # Jaccard 相似度作为基础
+        set1 = set(tokens1)
+        set2 = set(tokens2)
+        intersection = len(set1 & set2)
+        union = len(set1 | set2)
+
+        jaccard = intersection / union if union > 0 else 0
+
+        # 如果有 BM25，计算更精确的相似度
+        if self._bm25_available:
+            self.build_index([text1])
+            results = self.search(text2, top_k=1)
+            if results:
+                bm25_score = results[0][1]
+                # 归一化 BM25 分数
+                normalized_bm25 = min(bm25_score / 10, 1.0)
+                # 综合 Jaccard 和 BM25
+                return 0.4 * jaccard + 0.6 * normalized_bm25
+
+        return jaccard
 
 
 def main():

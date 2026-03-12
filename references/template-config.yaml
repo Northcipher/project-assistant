@@ -1,0 +1,542 @@
+# project-assistant 模板配置
+# 定义项目类型识别规则和模板映射
+
+project_types:
+  # ============ 移动端 ============
+  - id: android-app
+    name: Android 应用
+    patterns:
+      - "AndroidManifest.xml"
+      - "build.gradle"
+      - "app/src/main"
+    priority: 100
+    language: kotlin
+    build_system: gradle
+    template: "mobile/android.md"
+    variables:
+      MIN_SDK:
+        type: string
+        default: "21"
+        description: 最低 SDK 版本
+
+  - id: ios
+    name: iOS 应用
+    patterns:
+      - "*.xcodeproj"
+      - "*.xcworkspace"
+      - "Podfile"
+    priority: 100
+    language: swift
+    build_system: xcode
+    template: "mobile/ios.md"
+
+  - id: flutter
+    name: Flutter 应用
+    patterns:
+      - "pubspec.yaml"
+      - "lib/main.dart"
+    priority: 95
+    language: dart
+    build_system: flutter
+    template: "desktop/desktop.md"
+
+  # ============ 嵌入式 MCU ============
+  - id: stm32
+    name: STM32 项目
+    patterns:
+      - "*.ioc"
+    priority: 95
+    language: c
+    build_system: stm32cubeide
+    template: "embedded/mcu.md"
+    variables:
+      MCU:
+        type: string
+        required: true
+        description: MCU 型号
+      ARCH:
+        type: string
+        default: "ARM Cortex-M"
+        description: 架构
+
+  - id: esp32
+    name: ESP32 项目
+    patterns:
+      - "sdkconfig"
+      - "CMakeLists.txt"
+    priority: 85
+    language: c
+    build_system: cmake
+    template: "embedded/mcu.md"
+
+  - id: pico
+    name: Raspberry Pi Pico
+    patterns:
+      - "pico_sdk_import.cmake"
+    priority: 90
+    language: c
+    build_system: cmake
+    template: "embedded/mcu.md"
+
+  - id: keil
+    name: Keil 项目
+    patterns:
+      - "*.uvprojx"
+      - "*.uvproj"
+    priority: 95
+    language: c
+    build_system: keil
+    template: "embedded/mcu.md"
+
+  - id: iar
+    name: IAR 项目
+    patterns:
+      - "*.ewp"
+    priority: 95
+    language: c
+    build_system: iar
+    template: "embedded/mcu.md"
+
+  - id: platformio
+    name: PlatformIO 项目
+    patterns:
+      - "platformio.ini"
+    priority: 90
+    language: c
+    build_system: platformio
+    template: "embedded/mcu.md"
+
+  # ============ 嵌入式 RTOS ============
+  - id: freertos
+    name: FreeRTOS 项目
+    patterns:
+      - "FreeRTOSConfig.h"
+    priority: 90
+    language: c
+    build_system: make
+    template: "embedded/rtos.md"
+
+  - id: zephyr
+    name: Zephyr 项目
+    patterns:
+      - "Kconfig"
+      - "CMakeLists.txt"
+      - "zephyr/"
+    priority: 85
+    language: c
+    build_system: cmake
+    template: "embedded/rtos.md"
+
+  - id: rt-thread
+    name: RT-Thread 项目
+    patterns:
+      - "rtconfig.h"
+    priority: 90
+    language: c
+    build_system: scons
+    template: "embedded/rtos.md"
+
+  # ============ 嵌入式 Linux ============
+  - id: embedded-linux
+    name: 嵌入式 Linux
+    patterns:
+      - "defconfig"
+      - "Kbuild"
+    priority: 80
+    language: c
+    build_system: make
+    template: "embedded/linux.md"
+
+  - id: buildroot
+    name: Buildroot 项目
+    patterns:
+      - "Buildroot"
+      - "Config.in"
+    priority: 85
+    language: make
+    build_system: make
+    template: "embedded/linux.md"
+
+  - id: yocto
+    name: Yocto 项目
+    patterns:
+      - "meta-"
+      - "recipes-"
+    priority: 85
+    language: python
+    build_system: bitbake
+    template: "embedded/linux.md"
+
+  - id: openwrt
+    name: OpenWrt 项目
+    patterns:
+      - "feeds.conf"
+      - "openwrt/"
+    priority: 80
+    language: c
+    build_system: make
+    template: "embedded/linux.md"
+
+  # ============ QNX ============
+  - id: qnx
+    name: QNX 项目
+    patterns:
+      - "QNX_TARGET"
+      - "*.build"
+    priority: 90
+    language: c
+    build_system: make
+    template: "embedded/qnx.md"
+
+  # ============ Web 前端 ============
+  - id: react
+    name: React 应用
+    patterns:
+      - "package.json"
+      - "src/index.tsx"
+      - "src/main.tsx"
+    priority: 85
+    language: typescript
+    build_system: npm
+    template: "web/frontend.md"
+
+  - id: vue
+    name: Vue 应用
+    patterns:
+      - "vue.config.js"
+      - "vite.config.ts"
+    priority: 90
+    language: typescript
+    build_system: npm
+    template: "web/frontend.md"
+
+  - id: angular
+    name: Angular 应用
+    patterns:
+      - "angular.json"
+    priority: 95
+    language: typescript
+    build_system: npm
+    template: "web/frontend.md"
+
+  - id: svelte
+    name: Svelte 应用
+    patterns:
+      - "svelte.config.js"
+    priority: 90
+    language: javascript
+    build_system: npm
+    template: "web/frontend.md"
+
+  - id: nextjs
+    name: Next.js 应用
+    patterns:
+      - "next.config.js"
+      - "next.config.ts"
+    priority: 90
+    language: typescript
+    build_system: npm
+    template: "web/frontend.md"
+
+  - id: nuxt
+    name: Nuxt 应用
+    patterns:
+      - "nuxt.config.js"
+      - "nuxt.config.ts"
+    priority: 90
+    language: typescript
+    build_system: npm
+    template: "web/frontend.md"
+
+  # ============ Web 后端 ============
+  - id: django
+    name: Django 项目
+    patterns:
+      - "manage.py"
+      - "settings.py"
+    priority: 95
+    language: python
+    build_system: pip
+    template: "web/backend.md"
+
+  - id: fastapi
+    name: FastAPI 项目
+    patterns:
+      - "main.py"
+      - "requirements.txt"
+    priority: 80
+    language: python
+    build_system: pip
+    template: "web/backend.md"
+
+  - id: flask
+    name: Flask 项目
+    patterns:
+      - "app.py"
+      - "requirements.txt"
+    priority: 80
+    language: python
+    build_system: pip
+    template: "web/backend.md"
+
+  - id: spring
+    name: Spring 项目
+    patterns:
+      - "pom.xml"
+    priority: 95
+    language: java
+    build_system: maven
+    template: "web/backend.md"
+
+  - id: gradle-java
+    name: Gradle Java 项目
+    patterns:
+      - "build.gradle"
+      - "src/main/java"
+    priority: 90
+    language: java
+    build_system: gradle
+    template: "web/backend.md"
+
+  - id: go
+    name: Go 项目
+    patterns:
+      - "go.mod"
+    priority: 95
+    language: go
+    build_system: go-mod
+    template: "system/native.md"
+
+  - id: rust
+    name: Rust 项目
+    patterns:
+      - "Cargo.toml"
+    priority: 95
+    language: rust
+    build_system: cargo
+    template: "system/native.md"
+
+  # ============ 桌面应用 ============
+  - id: electron
+    name: Electron 应用
+    patterns:
+      - "package.json"
+    priority: 80
+    language: javascript
+    build_system: npm
+    template: "desktop/desktop.md"
+    content_filter: "electron"
+
+  - id: qt
+    name: Qt 项目
+    patterns:
+      - "*.pro"
+    priority: 85
+    language: cpp
+    build_system: qmake
+    template: "desktop/desktop.md"
+
+  - id: tauri
+    name: Tauri 应用
+    patterns:
+      - "src-tauri/"
+      - "tauri.conf.json"
+    priority: 90
+    language: rust
+    build_system: cargo
+    template: "desktop/desktop.md"
+
+  # ============ 系统编程 ============
+  - id: cmake
+    name: CMake 项目
+    patterns:
+      - "CMakeLists.txt"
+    priority: 70
+    language: cpp
+    build_system: cmake
+    template: "system/native.md"
+
+  - id: makefile
+    name: Makefile 项目
+    patterns:
+      - "Makefile"
+    priority: 70
+    language: c
+    build_system: make
+    template: "system/native.md"
+
+  - id: meson
+    name: Meson 项目
+    patterns:
+      - "meson.build"
+    priority: 80
+    language: c
+    build_system: meson
+    template: "system/native.md"
+
+  - id: bazel
+    name: Bazel 项目
+    patterns:
+      - "BUILD"
+      - "WORKSPACE"
+    priority: 90
+    language: java
+    build_system: bazel
+    template: "system/native.md"
+
+  # ============ 游戏开发 ============
+  - id: unity
+    name: Unity 项目
+    patterns:
+      - "Assets/"
+      - "ProjectSettings/"
+    priority: 95
+    language: csharp
+    build_system: unity
+    template: "game/unity.md"
+
+  - id: unreal
+    name: Unreal Engine 项目
+    patterns:
+      - "*.uproject"
+      - "Source/"
+    priority: 95
+    language: cpp
+    build_system: unreal
+    template: "game/unreal.md"
+
+  - id: godot
+    name: Godot 项目
+    patterns:
+      - "project.godot"
+    priority: 95
+    language: gdscript
+    build_system: godot
+    template: "game/godot.md"
+
+  # ============ AI/ML ============
+  - id: pytorch
+    name: PyTorch 项目
+    patterns:
+      - "requirements.txt"
+    priority: 75
+    language: python
+    build_system: pip
+    template: "ai/ml.md"
+    content_filter: "torch"
+
+  - id: tensorflow
+    name: TensorFlow 项目
+    patterns:
+      - "requirements.txt"
+    priority: 75
+    language: python
+    build_system: pip
+    template: "ai/ml.md"
+    content_filter: "tensorflow"
+
+  - id: jupyter
+    name: Jupyter 项目
+    patterns:
+      - "*.ipynb"
+    priority: 70
+    language: python
+    build_system: pip
+    template: "ai/ml.md"
+
+  # ============ .NET ============
+  - id: dotnet
+    name: .NET 项目
+    patterns:
+      - "*.csproj"
+      - "*.sln"
+    priority: 95
+    language: csharp
+    build_system: dotnet
+    template: "system/dotnet.md"
+
+  # ============ PHP ============
+  - id: php
+    name: PHP 项目
+    patterns:
+      - "composer.json"
+    priority: 80
+    language: php
+    build_system: composer
+    template: "web/backend.md"
+
+  # ============ Scala ============
+  - id: scala
+    name: Scala 项目
+    patterns:
+      - "build.sbt"
+    priority: 90
+    language: scala
+    build_system: sbt
+    template: "web/backend.md"
+
+  # ============ Kotlin Multiplatform ============
+  - id: kotlin-multiplatform
+    name: Kotlin Multiplatform
+    patterns:
+      - "commonMain/"
+      - "build.gradle.kts"
+    priority: 85
+    language: kotlin
+    build_system: gradle
+    template: "desktop/desktop.md"
+
+# ============ 模板继承 ============
+template_inheritance:
+  - parent: "embedded/mcu.md"
+    children:
+      - "embedded/stm32.md"
+      - "embedded/esp32.md"
+      - "embedded/pico.md"
+
+  - parent: "web/frontend.md"
+    children:
+      - "web/react.md"
+      - "web/vue.md"
+      - "web/angular.md"
+
+  - parent: "embedded/linux.md"
+    children:
+      - "embedded/buildroot.md"
+      - "embedded/yocto.md"
+
+# ============ 变量定义 ============
+variable_types:
+  string:
+    description: 字符串类型
+    validation: ".+"
+
+  number:
+    description: 数字类型
+    validation: "\\d+"
+
+  boolean:
+    description: 布尔类型
+    values: ["true", "false"]
+
+  enum:
+    description: 枚举类型
+    values: []  # 由具体变量定义
+
+# ============ 默认排除规则 ============
+exclude_patterns:
+  directories:
+    - ".git"
+    - "node_modules"
+    - "venv"
+    - "__pycache__"
+    - "build"
+    - "dist"
+    - "target"
+    - ".gradle"
+
+  files:
+    - "*.min.js"
+    - "*.min.css"
+    - "*.lock"
+    - "*.pyc"

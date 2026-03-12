@@ -71,7 +71,7 @@ TRIGGER when: 用户询问项目相关问题：
 
 ## 执行流程
 
-### Step 1: 确定项目目录
+### Step 1: 确定项目目录（REQUIRED）
 
 ```bash
 # 读取配置的工作目录
@@ -80,11 +80,24 @@ python3 {baseDir}/scripts/config_manager.py {baseDir} get workdir
 
 优先级：命令行参数 > 配置的 workdir > 当前目录
 
-### Step 2: 检查项目文档
+### Step 2: 检查项目文档（REQUIRED）
 
-检查 `$PROJECT_DIR/.claude/project.md` 是否存在，不存在则调用 `/init`
+**必须**检查 `$PROJECT_DIR/.projmeta/project.md` 是否存在。
 
-### Step 3: 智能缓存检查
+```bash
+# 检查文档是否存在
+if [ ! -f "$PROJECT_DIR/.projmeta/project.md" ]; then
+    # 不存在则调用 /init 生成
+    # 详见 references/guides/init.md
+fi
+```
+
+⚠️ **输出路径强制要求**：
+- **唯一正确路径**: `$PROJECT_DIR/.projmeta/project.md`
+- **禁止**输出到项目根目录
+- **禁止**输出到其他任意位置
+
+### Step 3: 智能缓存检查（REQUIRED）
 
 根据问题类型决定缓存检查策略：
 
@@ -99,7 +112,7 @@ python3 {baseDir}/scripts/config_manager.py {baseDir} get workdir
 python3 {baseDir}/scripts/utils/cache_manager.py check "$PROJECT_DIR" --quick
 ```
 
-### Step 4: 搜索历史问答
+### Step 4: 搜索历史问答（REQUIRED）
 
 ```bash
 python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" search "$QUERY"
@@ -116,10 +129,32 @@ python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" search "$QUERY"
 | MODIFY | 如何修改 | 步骤指导 |
 | IMPACT | 影响什么 | 影响树 |
 
-### Step 6: 沉淀问答文档
+### Step 6: 沉淀问答文档（REQUIRED）
 
 ```bash
 python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" create "$QUESTION" "$ANSWER" "$FILES" "$TAGS"
+```
+
+---
+
+## ⚠️ 输出检查清单（MUST VERIFY）
+
+初始化完成后，**必须**验证以下内容：
+
+```
+□ 输出路径正确：$PROJECT_DIR/.projmeta/project.md
+□ 包含：基本信息表格（项目名称、类型、语言、框架等）
+□ 包含：目录结构
+□ 包含：模块划分
+□ 包含：入口点
+□ 包含：构建指南
+□ 包含：配置文件
+□ 格式符合模板：references/templates/project-template.md
+```
+
+**验证命令**：
+```bash
+python3 {baseDir}/scripts/validate_output.py "$PROJECT_DIR"
 ```
 
 ---
@@ -144,6 +179,9 @@ python3 {baseDir}/scripts/utils/cache_manager.py <check|update|clear> "$PROJECT_
 
 # 调用链分析
 python3 {baseDir}/scripts/utils/call_chain_analyzer.py "$PROJECT_DIR" "$FUNCTION" --impact
+
+# 输出校验（MUST）
+python3 {baseDir}/scripts/validate_output.py "$PROJECT_DIR"
 ```
 
 ---

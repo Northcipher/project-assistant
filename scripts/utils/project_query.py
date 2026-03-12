@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 项目文档查询工具
-从.claude/project.md中提取结构化信息
+从.projmeta/project.md中提取结构化信息
 """
 
 import os
@@ -149,7 +149,7 @@ def main():
     else:
         target_dir = sys.argv[1]
 
-    md_path = os.path.join(target_dir, '.claude', 'project.md')
+    md_path = os.path.join(target_dir, '.projmeta', 'project.md')
 
     if len(sys.argv) > 2:
         # 查询模式

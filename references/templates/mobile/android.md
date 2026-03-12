@@ -75,7 +75,7 @@ app/src/main/
 
 使用模板：`~/.claude/commands/init/templates/project-template.md`
 
-输出到：`$TARGET_DIR/.claude/project.md`
+输出到：`$TARGET_DIR/.projmeta/project.md`
 
 ## 输出格式
 
@@ -99,5 +99,5 @@ Jetpack组件:
   1. {feature1}
   2. {feature2}
 
-已生成项目文档: .claude/project.md
+已生成项目文档: .projmeta/project.md
 ```

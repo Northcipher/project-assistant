@@ -71,5 +71,5 @@ project/
   - 架构: {MVVM/MVC}
   - 依赖管理: {SPM/CocoaPods}
 
-已生成项目文档: .claude/project.md
+已生成项目文档: .projmeta/project.md
 ```

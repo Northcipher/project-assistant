@@ -98,5 +98,5 @@ IPC使用:
 
 核心功能: {count} 项
 
-已生成项目文档: .claude/project.md
+已生成项目文档: .projmeta/project.md
 ```

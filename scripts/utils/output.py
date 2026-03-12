@@ -22,7 +22,7 @@ def print_result(result: Dict[str, Any]):
     if result.get('target_platform'):
         print(f"目标平台: {result.get('target_platform')}")
 
-    print(f"\n已生成项目文档: .claude/project.md")
+    print(f"\n已生成项目文档: .projmeta/project.md")
     print("=" * 50)
 
 

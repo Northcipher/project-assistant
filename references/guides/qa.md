@@ -31,7 +31,7 @@ python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" <command> [args]
 ## 文档结构
 
 ```
-项目目录/.claude/
+项目目录/.projmeta/
 ├── index/qa_index.json    # 问答索引
 └── docs/qa/               # 问答文档
     ├── architecture/

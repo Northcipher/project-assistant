@@ -46,5 +46,5 @@
 框架: {Qt/Electron/Flutter}
 支持平台: Windows/macOS/Linux
 
-已生成项目文档: .claude/project.md
+已生成项目文档: .projmeta/project.md
 ```

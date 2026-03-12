@@ -15,6 +15,25 @@
 | `--depth=N` | 扫描深度 | 3 |
 | `--quick` | 快速模式 | false |
 
+---
+
+## ⚠️ 输出路径（强制要求）
+
+**唯一正确路径**: `$PROJECT_DIR/.projmeta/project.md`
+
+```
+项目根目录/
+└── .projmeta/
+    └── project.md    ← 必须输出到这里
+```
+
+**禁止行为**:
+- ❌ 输出到项目根目录（如 `PROJECT.md`、`project.md`）
+- ❌ 输出到其他任意位置
+- ❌ 更改文件名
+
+---
+
 ## 执行流程
 
 ```bash
@@ -25,8 +44,25 @@ python3 {baseDir}/scripts/detector.py "$PROJECT_DIR"
 # 根据 project_type 加载 references/templates/ 下对应模板
 
 # 3. 生成文档
-# 输出到 .claude/project.md
+# 输出到 .projmeta/project.md
 ```
+
+---
+
+## 模板格式（必须遵守）
+
+生成的文档**必须**包含以下章节：
+
+| 章节 | 必需 | 说明 |
+|------|------|------|
+| 基本信息 | ✅ | 项目名称、类型、语言、框架等 |
+| 目录结构 | ✅ | 项目目录树 |
+| 模块划分 | ✅ | 核心模块和工具模块 |
+| 入口点 | ✅ | 主入口和其他入口 |
+| 构建指南 | ✅ | 安装、构建、运行命令 |
+| 配置文件 | ✅ | 配置项表格 |
+
+详细模板格式见: `references/templates/project-template.md`
 
 ## 项目类型映射
 
@@ -46,7 +82,7 @@ python3 {baseDir}/scripts/detector.py "$PROJECT_DIR"
 ## 输出结构
 
 ```
-.claude/
+.projmeta/
 ├── project.md           # L0 项目概览
 ├── index/               # 数据索引
 │   ├── processes.json

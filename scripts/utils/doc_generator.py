@@ -21,13 +21,13 @@ class DocGenerator:
 
     def __init__(self, project_dir: str):
         self.project_dir = Path(project_dir).resolve()
-        self.claude_dir = self.project_dir / '.claude'
-        self.docs_dir = self.claude_dir / 'docs'
-        self.index_dir = self.claude_dir / 'index'
+        self.projmeta_dir = self.project_dir / '.projmeta'
+        self.docs_dir = self.projmeta_dir / 'docs'
+        self.index_dir = self.projmeta_dir / 'index'
 
     def ensure_dirs(self) -> None:
         """确保目录存在"""
-        self.claude_dir.mkdir(parents=True, exist_ok=True)
+        self.projmeta_dir.mkdir(parents=True, exist_ok=True)
         self.docs_dir.mkdir(parents=True, exist_ok=True)
         self.index_dir.mkdir(parents=True, exist_ok=True)
         (self.docs_dir / 'subsystems').mkdir(parents=True, exist_ok=True)
@@ -96,7 +96,7 @@ class DocGenerator:
         content = "\n".join(lines)
 
         # 写入文件
-        project_md_path = self.claude_dir / 'project.md'
+        project_md_path = self.projmeta_dir / 'project.md'
         project_md_path.write_text(content, encoding='utf-8')
 
         return content
@@ -373,7 +373,7 @@ class DocGenerator:
 
     def read_project_md(self) -> Optional[str]:
         """读取项目概览"""
-        path = self.claude_dir / 'project.md'
+        path = self.projmeta_dir / 'project.md'
         if path.exists():
             return path.read_text(encoding='utf-8')
         return None
@@ -404,7 +404,7 @@ class DocGenerator:
     def get_doc_structure(self) -> Dict[str, Any]:
         """获取当前文档结构"""
         result = {
-            'has_project_md': (self.claude_dir / 'project.md').exists(),
+            'has_project_md': (self.projmeta_dir / 'project.md').exists(),
             'indexes': [],
             'l1_docs': [],
             'l2_docs': [],
@@ -470,7 +470,7 @@ def main():
             'build_cmd': 'make all',
         }
         content = gen.generate_l0_project_md(project_info)
-        print(f"Generated: {gen.claude_dir / 'project.md'}")
+        print(f"Generated: {gen.projmeta_dir / 'project.md'}")
         print(f"Size: {len(content)} bytes")
 
     else:

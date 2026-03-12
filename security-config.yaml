@@ -1,0 +1,87 @@
+# project-assistant 安全配置
+# 配置敏感信息保护、审计日志、数据保留等
+
+sensitive:
+  # 排除的敏感文件（glob 模式）
+  exclude_files:
+    - '.env*'
+    - '*.pem'
+    - '*.key'
+    - '*.p12'
+    - '*.jks'
+    - '*.keystore'
+    - 'credentials.json'
+    - 'secrets.json'
+    - 'secrets.yaml'
+    - 'service-account.json'
+    - 'id_rsa'
+    - 'id_dsa'
+    - 'id_ecdsa'
+    - 'id_ed25519'
+
+  # 排除的敏感目录
+  exclude_dirs:
+    - 'secrets/'
+    - '.secrets/'
+    - 'private/'
+    - 'credentials/'
+    - '.ssh/'
+    - '.gnupg/'
+    - '.aws/'
+    - '.azure/'
+    - '.gcloud/'
+
+  # 需要脱敏的模式关键词
+  mask_patterns:
+    - password
+    - passwd
+    - pwd
+    - api_key
+    - apikey
+    - secret
+    - secret_key
+    - secretkey
+    - token
+    - access_token
+    - auth_token
+    - private_key
+    - privatekey
+    - client_secret
+    - credentials
+    - database_url
+
+  # 发现敏感信息时的行为
+  # warn: 警告并继续
+  # error: 报错并停止
+  # ignore: 忽略继续
+  on_sensitive_found: warn
+
+audit:
+  # 是否启用审计日志
+  enabled: true
+
+  # 日志文件路径（相对于项目根目录）
+  log_file: .projmeta/audit.log
+
+  # 日志级别
+  # debug: 详细调试信息
+  # info: 一般信息
+  # warn: 警告信息
+  # error: 错误信息
+  log_level: info
+
+  # 日志文件最大大小（MB）
+  max_log_size_mb: 10
+
+  # 日志轮转保留数量
+  log_rotation_count: 5
+
+data_retention:
+  # 缓存保留天数
+  cache_ttl_days: 7
+
+  # 问答文档保留天数
+  qa_docs_ttl_days: 30
+
+  # 审计日志保留天数
+  audit_logs_ttl_days: 90

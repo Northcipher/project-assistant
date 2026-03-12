@@ -363,7 +363,7 @@ def check_doc_sync_status(project_dir: str, doc_token: str = None) -> Dict[str, 
 
 def save_sync_record(project_dir: str, record: Dict) -> None:
     """保存同步记录"""
-    record_path = os.path.join(project_dir, ".claude", "feishu_sync.json")
+    record_path = os.path.join(project_dir, ".projmeta", "feishu_sync.json")
     os.makedirs(os.path.dirname(record_path), exist_ok=True)
 
     record["updated_at"] = datetime.now().isoformat()

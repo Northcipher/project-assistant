@@ -79,12 +79,12 @@ def build_inverted_index(entries: List[Dict]) -> Dict[str, List[str]]:
 
 def get_qa_dir(project_dir: str) -> str:
     """获取问答文档目录"""
-    return os.path.join(project_dir, ".claude", QA_DOCS_DIR)
+    return os.path.join(project_dir, ".projmeta", QA_DOCS_DIR)
 
 
 def get_index_path(project_dir: str) -> str:
     """获取索引文件路径"""
-    return os.path.join(project_dir, ".claude", QA_INDEX_FILE)
+    return os.path.join(project_dir, ".projmeta", QA_INDEX_FILE)
 
 
 def ensure_dirs(project_dir: str) -> None:
@@ -246,7 +246,7 @@ def create_qa_doc(project_dir: str, question: str, answer: str,
         "id": hashlib.md5(question.encode()).hexdigest()[:8],
         "question": question,
         "category": category,
-        "doc_path": os.path.relpath(doc_path, os.path.join(project_dir, ".claude")),
+        "doc_path": os.path.relpath(doc_path, os.path.join(project_dir, ".projmeta")),
         "created_at": datetime.now().isoformat(),
         "git_commit": get_git_commit(project_dir),
         "file_refs": file_refs or [],
@@ -350,7 +350,7 @@ def check_outdated(project_dir: str, entry_id: str = None) -> Dict[str, Any]:
 
 def get_qa_doc_content(project_dir: str, doc_path: str) -> Optional[str]:
     """读取问答文档内容"""
-    full_path = os.path.join(project_dir, ".claude", doc_path)
+    full_path = os.path.join(project_dir, ".projmeta", doc_path)
     if os.path.exists(full_path):
         try:
             with open(full_path, 'r', encoding='utf-8') as f:
@@ -376,7 +376,7 @@ def delete_qa_doc(project_dir: str, entry_id: str) -> Dict[str, Any]:
     for i, entry in enumerate(index["entries"]):
         if entry["id"] == entry_id:
             # 删除文件
-            doc_path = os.path.join(project_dir, ".claude", entry["doc_path"])
+            doc_path = os.path.join(project_dir, ".projmeta", entry["doc_path"])
             if os.path.exists(doc_path):
                 os.remove(doc_path)
 

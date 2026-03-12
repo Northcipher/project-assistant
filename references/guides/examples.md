@@ -8,7 +8,7 @@
 助手: [1/4] 探测项目类型... ✓ react (置信度: 95%)
       [2/4] 分析项目结构... ✓
       [3/4] 解析配置文件... ✓
-      [4/4] 生成项目文档... ✓ .claude/project.md
+      [4/4] 生成项目文档... ✓ .projmeta/project.md
 ```
 
 ## 智能问答
@@ -27,7 +27,7 @@
       - `src/pages/Login.tsx:45-78`
       - `src/api/auth.ts:23-56`
 
-      📝 已生成文档: .claude/docs/qa/feature/xxx.md
+      📝 已生成文档: .projmeta/docs/qa/feature/xxx.md
 ```
 
 ## 影响分析

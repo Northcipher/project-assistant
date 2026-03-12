@@ -130,7 +130,7 @@ class CacheManager:
     def __init__(self, project_dir: str, config: CacheConfig = None):
         self.project_dir = Path(project_dir).resolve()
         self.config = config or DEFAULT_CONFIG
-        self._cache_path = self.project_dir / '.claude' / 'cache.json'
+        self._cache_path = self.project_dir / '.projmeta' / 'cache.json'
         self._cache: Optional[CacheEntry] = None
         self._dirty = False
         # 子系统缓存管理
@@ -536,6 +536,140 @@ class CacheManager:
         cache.metadata[key] = value
         self._dirty = True
 
+    def incremental_update(self, changed_files: List[str],
+                           analysis_data: Dict[str, Any] = None) -> CacheEntry:
+        """增量更新缓存，只处理变更文件
+
+        Args:
+            changed_files: 变更文件列表
+            analysis_data: 新的分析数据
+
+        Returns:
+            更新后的缓存
+        """
+        cache = self.load()
+
+        # 1. 更新变更文件的哈希
+        for file_path in changed_files:
+            full_path = self.project_dir / file_path
+            if full_path.exists():
+                h = self.compute_file_hash(full_path)
+                if h:
+                    cache.file_hashes[file_path] = h
+            elif file_path in cache.file_hashes:
+                # 文件已删除，移除哈希
+                del cache.file_hashes[file_path]
+
+        # 2. 使相关缓存失效
+        self.invalidate_by_files(changed_files)
+
+        # 3. 合并分析数据
+        if analysis_data:
+            cache.analysis_cache = {**cache.analysis_cache, **analysis_data}
+
+        # 4. 更新时间戳
+        cache.timestamp = datetime.now().isoformat()
+
+        self._cache = cache
+        self._dirty = True
+        self.save()
+
+        return cache
+
+    def invalidate_by_files(self, files: List[str]) -> List[str]:
+        """使涉及指定文件的缓存失效
+
+        Args:
+            files: 文件列表
+
+        Returns:
+            失效的缓存键列表
+        """
+        cache = self.load()
+        invalidated_keys = []
+
+        # 检查分析缓存中的每个条目
+        keys_to_remove = []
+        for key, value in cache.analysis_cache.items():
+            if isinstance(value, dict):
+                # 检查是否有文件引用
+                file_refs = value.get('file_refs', [])
+                if isinstance(file_refs, list):
+                    for ref in file_refs:
+                        for f in files:
+                            if f in ref or ref in f:
+                                keys_to_remove.append(key)
+                                invalidated_keys.append(key)
+                                break
+
+                # 检查 source_file 字段
+                source_file = value.get('source_file', '')
+                if source_file:
+                    for f in files:
+                        if f in source_file or source_file in f:
+                            keys_to_remove.append(key)
+                            invalidated_keys.append(key)
+                            break
+
+        # 移除失效的缓存
+        for key in set(keys_to_remove):
+            del cache.analysis_cache[key]
+
+        if keys_to_remove:
+            self._dirty = True
+
+        return invalidated_keys
+
+    def get_file_changes_since_last_cache(self) -> Dict[str, Any]:
+        """获取上次缓存以来的文件变更
+
+        Returns:
+            变更信息
+        """
+        cache = self.load()
+        current_hashes = self.compute_project_hashes()
+
+        added = []
+        modified = []
+        deleted = []
+
+        # 检查新增和修改
+        for file_path, hash_value in current_hashes.items():
+            if file_path not in cache.file_hashes:
+                added.append(file_path)
+            elif cache.file_hashes[file_path] != hash_value:
+                modified.append(file_path)
+
+        # 检查删除
+        for file_path in cache.file_hashes:
+            if file_path not in current_hashes:
+                deleted.append(file_path)
+
+        return {
+            'added': added,
+            'modified': modified,
+            'deleted': deleted,
+            'total_changes': len(added) + len(modified) + len(deleted),
+            'has_changes': bool(added or modified or deleted),
+        }
+
+    def get_incremental_update_info(self) -> Dict[str, Any]:
+        """获取增量更新信息摘要
+
+        Returns:
+            更新信息
+        """
+        changes = self.get_file_changes_since_last_cache()
+        validity = self.check_validity()
+
+        return {
+            'cache_valid': validity.get('is_valid', False),
+            'last_update': self._cache.timestamp if self._cache else '',
+            'files_tracked': len(self._cache.file_hashes) if self._cache else 0,
+            'changes': changes,
+            'needs_update': changes['has_changes'] or not validity.get('is_valid', False),
+        }
+
 
 def cleanup_old_caches(base_dir: str, max_age_days: int = 7,
                        max_total_size: int = 100 * 1024 * 1024) -> Dict[str, Any]:
@@ -559,7 +693,7 @@ def cleanup_old_caches(base_dir: str, max_age_days: int = 7,
 
     # 查找所有缓存文件
     try:
-        for cache_file in base_path.rglob('.claude/cache.json'):
+        for cache_file in base_path.rglob('.projmeta/cache.json'):
             try:
                 stat = cache_file.stat()
                 cache_time = datetime.fromtimestamp(stat.st_mtime)

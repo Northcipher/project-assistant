@@ -93,5 +93,5 @@ Buildroot:
   1. {feature1}
   2. {feature2}
 
-已生成项目文档: .claude/project.md
+已生成项目文档: .projmeta/project.md
 ```

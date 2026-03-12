@@ -94,7 +94,7 @@ aosp/
 
 使用模板：`~/.claude/commands/init/templates/project-template.md`
 
-输出到：`$TARGET_DIR/.claude/project.md`
+输出到：`$TARGET_DIR/.projmeta/project.md`
 
 ## 输出格式
 
@@ -123,7 +123,7 @@ ABI支持:
 
 JNI接口: {count} 个
 
-已生成项目文档: .claude/project.md
+已生成项目文档: .projmeta/project.md
 ```
 
 ### AOSP项目
@@ -149,7 +149,7 @@ JNI接口: {count} 个
 
 核心功能: {count} 项
 
-已生成项目文档: .claude/project.md
+已生成项目文档: .projmeta/project.md
 ```
 
 ## Android.bp 解析

@@ -38,6 +38,23 @@ DEFAULT_INDEX = {
     "updated_at": None
 }
 
+# 语义匹配器（延迟加载）
+_semantic_matcher = None
+
+
+def get_semantic_matcher():
+    """获取语义匹配器实例"""
+    global _semantic_matcher
+    if _semantic_matcher is None:
+        try:
+            # 尝试导入 BM25 语义匹配器
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from utils.qa_cache import SemanticMatcher
+            _semantic_matcher = SemanticMatcher(use_jieba=True)
+        except ImportError:
+            _semantic_matcher = None
+    return _semantic_matcher
+
 
 def tokenize(text: str) -> List[str]:
     """分词：提取关键词"""
@@ -268,6 +285,18 @@ def create_qa_doc(project_dir: str, question: str, answer: str,
 
     save_index(project_dir, index)
 
+    # 自动关联知识图谱
+    try:
+        _link_to_knowledge_graph(project_dir, entry["id"], file_refs)
+    except Exception:
+        pass  # 知识图谱关联失败不影响主流程
+
+    # 记录审计日志
+    try:
+        _log_audit(project_dir, "qa_create", entry["id"])
+    except Exception:
+        pass
+
     return {
         "success": True,
         "doc_path": doc_path,
@@ -276,16 +305,71 @@ def create_qa_doc(project_dir: str, question: str, answer: str,
     }
 
 
+def _link_to_knowledge_graph(project_dir: str, qa_id: str, file_refs: List[str]) -> None:
+    """自动关联知识图谱"""
+    if not file_refs:
+        return
+
+    try:
+        import sys
+        import os
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from knowledge_graph import KnowledgeGraph
+
+        kg = KnowledgeGraph(project_dir)
+        kg.link_qa_to_code(qa_id, file_refs)
+    except ImportError:
+        pass
+
+
+def _log_audit(project_dir: str, operation: str, details: str) -> None:
+    """记录审计日志"""
+    try:
+        import sys
+        import os
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from security.audit_logger import AuditLogger
+
+        logger = AuditLogger(project_dir)
+        logger.log_operation(operation, {"qa_id": details})
+    except ImportError:
+        pass
+
+
 def search_qa(project_dir: str, query: str) -> List[Dict[str, Any]]:
-    """搜索问答（使用倒排索引加速）"""
+    """搜索问答（使用语义匹配 + 倒排索引加速）"""
     index = load_index(project_dir)
+
+    if not index["entries"]:
+        return []
 
     # 提取查询关键词
     query_keywords = tokenize(query)
     if not query_keywords:
         return []
 
-    # 使用倒排索引查找
+    # 尝试使用 BM25 语义匹配
+    matcher = get_semantic_matcher()
+    if matcher:
+        # 构建文档集合
+        documents = [e.get("question", "") for e in index["entries"]]
+        matcher.build_index(documents)
+
+        # BM25 搜索
+        results = matcher.search(query, top_k=10)
+
+        # 构建结果
+        id_to_entry = {e["id"]: e for e in index["entries"]}
+        matched_results = []
+        for doc_idx, score in results:
+            if doc_idx < len(index["entries"]):
+                entry = index["entries"][doc_idx]
+                matched_results.append({**entry, "score": float(score), "method": "bm25"})
+
+        if matched_results:
+            return matched_results
+
+    # 回退到倒排索引查找
     inverted = index.get("inverted_index", {})
     entry_scores = {}
 
@@ -305,7 +389,7 @@ def search_qa(project_dir: str, query: str) -> List[Dict[str, Any]]:
     results = []
     for entry_id, score in entry_scores.items():
         if entry_id in id_to_entry:
-            results.append({**id_to_entry[entry_id], "score": score})
+            results.append({**id_to_entry[entry_id], "score": score, "method": "inverted_index"})
 
     results.sort(key=lambda x: x["score"], reverse=True)
     return results[:10]

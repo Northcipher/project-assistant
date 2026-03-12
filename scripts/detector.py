@@ -171,8 +171,13 @@ class ProjectDetector:
         self._files_cache: Optional[List[str]] = None
         self._dirs_cache: Optional[List[str]] = None
 
-    def detect(self) -> Dict[str, Any]:
-        """执行探测"""
+    def detect(self, enable_ast: bool = True, enable_deps: bool = True) -> Dict[str, Any]:
+        """执行探测
+
+        Args:
+            enable_ast: 是否启用 AST 解析
+            enable_deps: 是否启用依赖分析
+        """
         start_time = time.time()
         logger.debug(f"开始探测项目: {self.target_dir}")
 
@@ -190,6 +195,18 @@ class ProjectDetector:
 
         # 执行探测
         result = self._do_detect()
+
+        # AST 解析（提取函数和类）
+        if enable_ast:
+            ast_result = self._extract_code_structure()
+            if ast_result:
+                result['code_structure'] = ast_result
+
+        # 依赖分析
+        if enable_deps:
+            deps_result = self._analyze_dependencies()
+            if deps_result:
+                result['dependency_analysis'] = deps_result
 
         # 缓存结果
         self._cache[cache_key] = {
@@ -837,6 +854,91 @@ class ProjectDetector:
     def clear_cache(cls):
         """清除缓存"""
         cls._cache.clear()
+
+    def _extract_code_structure(self) -> Optional[Dict[str, Any]]:
+        """提取代码结构（使用 AST 解析）"""
+        try:
+            # 尝试导入 AST 解析器
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from ast_parser import ASTParser
+
+            parser = ASTParser()
+            result = {
+                'functions': [],
+                'classes': [],
+                'imports': [],
+            }
+
+            # 扫描主要源文件
+            source_extensions = ['.py', '.js', '.ts', '.tsx', '.java', '.go', '.rs', '.c', '.cpp']
+            scanned = 0
+            max_files = 20  # 限制扫描文件数
+
+            for ext in source_extensions:
+                if scanned >= max_files:
+                    break
+                for root, dirs, files in os.walk(self.target_dir):
+                    dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+                    for f in files:
+                        if f.endswith(ext) and scanned < max_files:
+                            file_path = os.path.join(root, f)
+                            try:
+                                ast_result = parser.parse_file(file_path)
+                                if ast_result:
+                                    rel_path = os.path.relpath(file_path, self.target_dir)
+                                    for func in ast_result.get('functions', [])[:5]:
+                                        result['functions'].append({
+                                            'name': func.get('name'),
+                                            'file': rel_path,
+                                            'line': func.get('line_start'),
+                                        })
+                                    for cls in ast_result.get('classes', [])[:3]:
+                                        result['classes'].append({
+                                            'name': cls.get('name'),
+                                            'file': rel_path,
+                                            'line': cls.get('line_start'),
+                                        })
+                                    scanned += 1
+                            except Exception:
+                                pass
+
+            # 限制输出数量
+            result['functions'] = result['functions'][:30]
+            result['classes'] = result['classes'][:20]
+            result['total_functions'] = len(result['functions'])
+            result['total_classes'] = len(result['classes'])
+
+            return result if result['functions'] or result['classes'] else None
+
+        except ImportError:
+            logger.debug("AST 解析器不可用")
+            return None
+
+    def _analyze_dependencies(self) -> Optional[Dict[str, Any]]:
+        """分析项目依赖"""
+        try:
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from dependency_analyzer import DependencyAnalyzer
+
+            analyzer = DependencyAnalyzer(str(self.target_dir))
+            result = analyzer.analyze()
+
+            # 简化输出
+            return {
+                'total': result.get('total_dependencies', 0),
+                'direct': result.get('direct_dependencies', 0),
+                'circular': len(result.get('circular_dependencies', [])),
+                'conflicts': len(result.get('version_conflicts', [])),
+                'recommendations': result.get('recommendations', [])[:3],
+            }
+
+        except ImportError:
+            logger.debug("依赖分析器不可用")
+            return None
 
 
 def main():

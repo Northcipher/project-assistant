@@ -103,7 +103,7 @@ project-assistant/
 │   ├── feishu_doc_manager.py   # 飞书集成
 │   ├── validate_output.py      # 输出校验
 │   │
-│   ├── # v2.0 新增模块
+│   ├── # 核心增强模块
 │   ├── watcher.py              # 文件监控器
 │   ├── knowledge_graph.py      # 知识图谱
 │   ├── qa_recommender.py       # 问答推荐
@@ -632,10 +632,10 @@ print(validity['changed_files'])
 # 更新缓存
 manager.update(analysis_data={'key': 'value'})
 
-# 增量更新 (v2.0 新增)
+# 增量更新
 manager.incremental_update(['src/main.py', 'src/utils.py'])
 
-# 使相关缓存失效 (v2.0 新增)
+# 使相关缓存失效
 invalidated = manager.invalidate_by_files(['src/auth.py'])
 
 # 获取 Git 状态
@@ -963,7 +963,9 @@ python3 scripts/utils/call_chain_analyzer.py /path/to/project login --impact
 
 ## 安全体系
 
-### Phase 0 安全基础设施 (v2.0 新增)
+### 安全体系
+
+### 敏感信息扫描器
 
 项目内置完整的安全体系，保护敏感信息。
 
@@ -1032,9 +1034,7 @@ trail = logger.get_audit_trail({'operation': 'scan'})
 
 ## 文件监控与增量更新
 
-### Phase 1 增量分析 (v2.0 新增)
-
-#### 文件监控器
+### 文件监控器
 
 **文件**: `scripts/watcher.py`
 
@@ -1084,9 +1084,7 @@ file_diff = watcher.get_file_diff('src/main.py')
 
 ## 智能问答增强
 
-### Phase 2 语义增强 (v2.0 新增)
-
-#### 语义相似度匹配
+### 语义相似度匹配
 
 **文件**: `scripts/utils/qa_cache.py`
 
@@ -1158,9 +1156,7 @@ all_recs = recommender.get_recommendations(
 
 ## AST 代码分析
 
-### Phase 3 深度代码分析 (v2.0 新增)
-
-#### AST 解析器
+### AST 解析器
 
 **文件**: `scripts/ast_parser.py`
 
@@ -1220,9 +1216,7 @@ routes = analyzer.find_api_routes()
 
 ## 项目识别与模板
 
-### Phase 4 项目识别扩展 (v2.0 新增)
-
-#### 项目类型配置
+### 项目类型配置
 
 **文件**: `references/template-config.yaml`
 
@@ -1254,9 +1248,7 @@ matched = engine.match_project_type(files, dirs)
 
 ## 创新功能
 
-### Phase 5 高级特性 (v2.0 新增)
-
-#### 图表生成器
+### 图表生成器
 
 **文件**: `scripts/diagram_generator.py`
 

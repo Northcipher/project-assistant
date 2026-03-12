@@ -269,7 +269,7 @@ class CacheManager:
         return hashes
 
     def get_git_status(self) -> Dict[str, Any]:
-        """获取 Git 状态（并行执行多个 git 命令）"""
+        """获取 Git 状态（集成 Git Watcher）"""
         logger.debug(f"获取 Git 状态: {self.project_dir}")
         result = {
             'is_git_repo': False,
@@ -282,8 +282,42 @@ class CacheManager:
             'last_commit_message': '',
             'ahead': 0,
             'behind': 0,
+            'changed_files': [],  # 新增：变更文件列表
         }
 
+        # 尝试使用 GitWatcher（更详细的变更检测）
+        try:
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from git_watcher import GitWatcher
+
+            watcher = GitWatcher(str(self.project_dir))
+
+            # 获取未提交变更
+            changes = watcher.get_uncommitted_changes()
+            if changes:
+                result['changed_files'] = [c.file_path for c in changes[:50]]
+                result['has_changes'] = True
+                result['has_uncommitted'] = True
+
+            # 获取基本信息
+            branch = watcher.get_current_branch()
+            if branch:
+                result['is_git_repo'] = True
+                result['branch'] = branch
+
+            last_commit = watcher.get_last_commit()
+            if last_commit:
+                result['last_commit'] = last_commit[:7]
+                result['last_commit_time'] = ''  # GitWatcher 可以扩展
+
+            return result
+
+        except ImportError:
+            pass  # 回退到原有逻辑
+
+        # 原有的 Git 检测逻辑（回退方案）
         def run_git_command(cmd: List[str], timeout: int = 5) -> tuple:
             """运行单个 git 命令"""
             try:

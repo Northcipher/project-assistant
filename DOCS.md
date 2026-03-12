@@ -22,6 +22,7 @@
 - [AST 代码分析](#ast-代码分析)
 - [项目识别与模板](#项目识别与模板)
 - [创新功能](#创新功能)
+- [v3.0 企业级功能](#v30-企业级功能)
 - [API 参考](#api-参考)
 - [扩展开发](#扩展开发)
 
@@ -97,6 +98,7 @@ project-assistant/
 ├── security-config.yaml        # 安全配置
 │
 ├── scripts/
+│   ├── cli.py                  # 统一 CLI 入口 ⭐
 │   ├── detector.py             # 项目类型探测器
 │   ├── config_manager.py       # 配置管理器
 │   ├── qa_doc_manager.py       # 问答文档管理
@@ -112,6 +114,29 @@ project-assistant/
 │   ├── diagram_generator.py    # 图表生成
 │   ├── dependency_analyzer.py  # 依赖分析
 │   ├── ai_analyzer.py          # AI 增强
+│   │
+│   ├── # v3.0 企业级模块
+│   ├── indexer/                # 分层索引器
+│   │   ├── lazy_indexer.py     # 延迟索引
+│   │   └── memory_manager.py   # 内存管理
+│   ├── multi_repo/             # 多仓库管理
+│   │   ├── mono_manager.py     # Monorepo 管理
+│   │   └── repo_linker.py      # 仓库关联
+│   ├── team/                   # 团队协作
+│   │   ├── team_knowledge.py   # 团队知识库
+│   │   ├── team_db.py          # 团队数据库
+│   │   ├── permission_manager.py # 权限管理
+│   │   └── collaboration.py    # 问答协作
+│   ├── integration/            # 企业集成
+│   │   ├── ci_cd.py            # CI/CD 集成
+│   │   ├── issue_tracker.py    # Issue 集成
+│   │   ├── code_review.py      # 代码审查
+│   │   └── webhook_server.py   # Webhook 服务
+│   ├── ai/                     # AI 能力
+│   │   ├── vector_store.py     # 向量检索
+│   │   ├── code_completion.py  # 代码补全
+│   │   ├── refactoring_advisor.py # 重构建议
+│   │   └── quality_predictor.py # 质量预测
 │   │
 │   ├── security/               # 安全模块
 │   │   ├── sensitive_scanner.py
@@ -1299,6 +1324,142 @@ print(result['code_smells'])   # 代码异味
 
 ---
 
+## v3.0 企业级功能
+
+### 分层延迟索引器
+
+**文件**: `scripts/indexer/lazy_indexer.py`
+
+```python
+from indexer.lazy_indexer import LazyIndexer
+
+indexer = LazyIndexer('/path/to/project')
+
+# 获取 L0 快速索引 (< 1s)
+l0 = indexer.get_l0_index()
+print(l0.files)  # 文件列表
+
+# 获取 L1 结构索引 (< 5s)
+l1 = indexer.get_l1_index()
+print(l1.functions)  # 函数定义
+
+# 预热 L2 语义索引 (后台)
+indexer.warmup_l2(priority_files=['src/main.py'])
+```
+
+**分层架构**:
+- L0 快速索引：文件元数据，< 1 秒
+- L1 结构索引：函数/类定义，< 5 秒
+- L2 语义索引：调用图、向量嵌入，< 30 秒
+- L3 深度索引：全量 AST、质量分析，后台运行
+
+### 多仓库管理器
+
+**文件**: `scripts/multi_repo/mono_manager.py`
+
+```python
+from multi_repo.mono_manager import MonoRepoManager
+
+manager = MonoRepoManager('/path/to/monorepo')
+
+# 添加仓库
+manager.add_repo('frontend', '../frontend', 'react')
+manager.add_repo('backend', '../backend', 'spring-boot')
+
+# 跨仓库搜索
+results = manager.cross_repo_search('登录功能')
+
+# 获取仓库依赖图
+dep_graph = manager.get_dep_graph()
+```
+
+### 团队知识库
+
+**文件**: `scripts/team/team_knowledge.py`
+
+```python
+from team.team_knowledge import TeamKnowledgeBase
+
+kb = TeamKnowledgeBase('/path/to/project')
+
+# 分享问答到团队
+kb.share_qa('q001', 'backend-team')
+
+# 导入团队知识
+qa_list = kb.import_team_qa('backend-team')
+
+# 合并知识库
+kb.merge_qa('source_team', 'target_team')
+```
+
+### CI/CD 集成
+
+**文件**: `scripts/integration/ci_cd.py`
+
+```python
+from integration.ci_cd import CICDIntegration
+
+ci = CICDIntegration('/path/to/project')
+
+# PR 创建时触发
+report = ci.on_pr_created(pr_info)
+
+# 生成分析报告
+report = ci.generate_report(format='markdown')
+```
+
+### 向量检索引擎
+
+**文件**: `scripts/ai/vector_store.py`
+
+```python
+from ai.vector_store import VectorStore
+
+store = VectorStore('/path/to/project')
+
+# 构建索引
+store.build_index()
+
+# 语义搜索
+results = store.search_code('用户认证流程', top_k=10)
+```
+
+### 重构顾问
+
+**文件**: `scripts/ai/refactoring_advisor.py`
+
+```python
+from ai.refactoring_advisor import RefactoringAdvisor
+
+advisor = RefactoringAdvisor('/path/to/project')
+
+# 分析重构建议
+suggestions = advisor.analyze('src/auth.py')
+
+# 生成报告
+report = advisor.get_refactoring_report()
+```
+
+### 质量预测器
+
+**文件**: `scripts/ai/quality_predictor.py`
+
+```python
+from ai.quality_predictor import QualityPredictor
+
+predictor = QualityPredictor('/path/to/project')
+
+# 预测风险
+assessment = predictor.predict_risk('src/auth.py')
+print(assessment.score)  # 风险评分 0-100
+print(assessment.level)  # low/medium/high/critical
+
+# 项目风险摘要
+summary = predictor.get_project_risk_summary()
+```
+
+---
+
 ## API 参考
 
 ### 配置管理 API
@@ -1431,6 +1592,16 @@ networkx>=3.0          # 图算法（可选）
 ---
 
 ## 版本历史
+
+### v3.0.0 (2026-03-12)
+
+**企业级升级：百万行代码、多仓库、微服务架构**
+
+- **性能优化**：分层延迟索引（L0-L3）、多仓库支持、内存优化
+- **团队协作**：团队知识库、权限管理、问答协作、审计合规
+- **企业集成**：CI/CD 集成、Issue 系统、代码审查、Webhook
+- **AI 能力**：向量检索、代码补全、重构建议、质量预测
+- **CLI 增强**：统一入口、新增命令、参数完善
 
 ### v2.0.0 (2026-03-12)
 

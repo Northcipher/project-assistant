@@ -17,7 +17,7 @@
 
 ---
 
-## ⚠️ 输出路径（强制要求）
+## 输出路径
 
 **唯一正确路径**: `$PROJECT_DIR/.projmeta/project.md`
 
@@ -27,29 +27,9 @@
     └── project.md    ← 必须输出到这里
 ```
 
-**禁止行为**:
-- ❌ 输出到项目根目录（如 `PROJECT.md`、`project.md`）
-- ❌ 输出到其他任意位置
-- ❌ 更改文件名
-
 ---
 
-## 执行流程
-
-```bash
-# 1. 探测项目类型
-python3 {baseDir}/scripts/detector.py "$PROJECT_DIR"
-
-# 2. 加载子模块
-# 根据 project_type 加载 references/templates/ 下对应模板
-
-# 3. 生成文档
-# 输出到 .projmeta/project.md
-```
-
----
-
-## 模板格式（必须遵守）
+## 模板格式
 
 生成的文档**必须**包含以下章节：
 

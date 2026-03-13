@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 统一命令入口
 提供所有项目分析功能的统一调用接口
@@ -21,6 +22,13 @@ v3.0 功能：
 
 import os
 import sys
+import io
+
+# 设置 UTF-8 编码输出（解决 Windows 控制台编码问题）
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 import json
 import argparse
 from pathlib import Path
@@ -39,9 +47,8 @@ def get_project_dir(args) -> str:
 
     # 尝试从配置读取
     try:
-        from config_manager import ConfigManager
-        config = ConfigManager(str(SCRIPTS_DIR))
-        workdir = config.get('workdir')
+        import config_manager
+        workdir = config_manager.get_workdir(str(SCRIPTS_DIR))
         if workdir:
             return workdir
     except:
@@ -50,11 +57,99 @@ def get_project_dir(args) -> str:
     return os.getcwd()
 
 
+def get_template_for_type(project_type: str) -> str:
+    """根据项目类型返回模板路径"""
+    type_template_map = {
+        'android-app': 'mobile/android.md',
+        'ios': 'mobile/ios.md',
+        'stm32': 'embedded/mcu.md',
+        'esp32': 'embedded/mcu.md',
+        'pico': 'embedded/mcu.md',
+        'keil': 'embedded/mcu.md',
+        'iar': 'embedded/mcu.md',
+        'platformio': 'embedded/mcu.md',
+        'freertos': 'embedded/rtos.md',
+        'zephyr': 'embedded/rtos.md',
+        'rt-thread': 'embedded/rtos.md',
+        'embedded-linux': 'embedded/linux.md',
+        'buildroot': 'embedded/linux.md',
+        'yocto': 'embedded/linux.md',
+        'openwrt': 'embedded/linux.md',
+        'qnx': 'embedded/qnx.md',
+        'react': 'web/frontend.md',
+        'vue': 'web/frontend.md',
+        'angular': 'web/frontend.md',
+        'svelte': 'web/frontend.md',
+        'nextjs': 'web/frontend.md',
+        'nuxt': 'web/frontend.md',
+        'django': 'web/backend.md',
+        'fastapi': 'web/backend.md',
+        'flask': 'web/backend.md',
+        'spring': 'web/backend.md',
+        'gradle-java': 'web/backend.md',
+        'php': 'web/backend.md',
+        'scala': 'web/backend.md',
+        'electron': 'desktop/desktop.md',
+        'qt': 'desktop/desktop.md',
+        'tauri': 'desktop/desktop.md',
+        'flutter': 'desktop/desktop.md',
+        'kotlin-multiplatform': 'desktop/desktop.md',
+        'go': 'system/native.md',
+        'rust': 'system/native.md',
+        'cmake': 'system/native.md',
+        'makefile': 'system/native.md',
+        'meson': 'system/native.md',
+        'bazel': 'system/native.md',
+        'dotnet': 'system/native.md',
+    }
+    return type_template_map.get(project_type, 'project-template.md')
+
+
+def generate_directory_tree(project_dir: str, max_depth: int = 3) -> str:
+    """生成目录结构树"""
+    import os
+    from pathlib import Path
+
+    project_path = Path(project_dir)
+    exclude_dirs = {'.git', 'node_modules', 'venv', '__pycache__', 'build', 'dist', 'target', '.gradle', '.projmeta'}
+
+    lines = []
+    for root, dirs, files in os.walk(project_path):
+        # 过滤排除目录
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+
+        rel_path = os.path.relpath(root, project_path)
+        depth = rel_path.count(os.sep) if rel_path != '.' else 0
+
+        if depth > max_depth:
+            continue
+
+        indent = '  ' * depth
+        folder_name = os.path.basename(root) if root != project_path else os.path.basename(project_dir)
+        lines.append(f"{indent}{folder_name}/")
+
+        for file in files[:10]:  # 限制每目录文件数
+            lines.append(f"{indent}  {file}")
+
+        if len(files) > 10:
+            lines.append(f"{indent}  ... ({len(files) - 10} more files)")
+
+    return '\n'.join(lines[:50])  # 限制总行数
+
+
 def cmd_init(args):
-    """初始化项目（集成所有功能）"""
+    """初始化项目（集成所有功能，自动生成 project.md）"""
     from detector import ProjectDetector
+    from template_engine import TemplateEngine
+    import config_manager
 
     project_dir = get_project_dir(args)
+
+    # 检查目录是否存在
+    if not os.path.isdir(project_dir):
+        print(f"错误: 目录不存在: {project_dir}")
+        sys.exit(1)
+
     result = {
         'project_dir': project_dir,
         'steps': {},
@@ -63,7 +158,7 @@ def cmd_init(args):
     print(f"正在初始化项目: {project_dir}")
 
     # Step 1: 安全扫描
-    print("\n[1/5] 安全扫描...")
+    print("\n[1/7] 安全扫描...")
     try:
         from security.sensitive_scanner import SensitiveScanner
         scanner = SensitiveScanner()
@@ -72,7 +167,7 @@ def cmd_init(args):
         result['steps']['security'] = {
             'status': 'completed',
             'sensitive_files': len(scan_result.sensitive_files),
-            'sensitive_contents': len(scan_result.sensitive_contents),
+            'sensitive_contents': len(scan_result.matches),
             'warnings': [],
         }
 
@@ -81,15 +176,15 @@ def cmd_init(args):
             for f in scan_result.sensitive_files[:3]:
                 print(f"    - {f}")
             result['steps']['security']['warnings'].extend(
-                [f.file for f in scan_result.sensitive_files[:5]]
+                scan_result.sensitive_files[:5]
             )
 
-        if scan_result.sensitive_contents:
-            print(f"  ⚠️ 发现 {len(scan_result.sensitive_contents)} 处敏感内容")
-            for c in scan_result.sensitive_contents[:3]:
-                print(f"    - {c.file}:{c.line}")
+        if scan_result.matches:
+            print(f"  ⚠️ 发现 {len(scan_result.matches)} 处敏感内容")
+            for c in scan_result.matches[:3]:
+                print(f"    - {c.file_path}:{c.line_number}")
 
-        if not scan_result.sensitive_files and not scan_result.sensitive_contents:
+        if not scan_result.sensitive_files and not scan_result.matches:
             print("  ✅ 未发现敏感信息")
 
     except ImportError as e:
@@ -97,7 +192,7 @@ def cmd_init(args):
         result['steps']['security'] = {'status': 'skipped', 'reason': str(e)}
 
     # Step 2: 项目检测
-    print("\n[2/5] 项目检测...")
+    print("\n[2/7] 项目检测...")
     detector = ProjectDetector(project_dir)
     detect_result = detector.detect(enable_ast=True, enable_deps=True)
 
@@ -109,7 +204,8 @@ def cmd_init(args):
         'scale': detect_result.get('scale', 'small'),
     }
 
-    print(f"  项目类型: {detect_result.get('project_type', 'unknown')}")
+    project_type = detect_result.get('project_type', 'unknown')
+    print(f"  项目类型: {project_type}")
     print(f"  语言: {detect_result.get('language', 'unknown')}")
     print(f"  构建系统: {detect_result.get('build_system', 'unknown')}")
     print(f"  规模: {detect_result.get('scale', 'small')}")
@@ -119,7 +215,7 @@ def cmd_init(args):
 
     # Step 3: AST 解析结果
     if 'code_structure' in detect_result:
-        print("\n[3/5] 代码结构分析...")
+        print("\n[3/7] 代码结构分析...")
         code_struct = detect_result['code_structure']
         result['steps']['ast'] = {
             'status': 'completed',
@@ -129,12 +225,12 @@ def cmd_init(args):
         print(f"  函数: {code_struct.get('total_functions', 0)}")
         print(f"  类: {code_struct.get('total_classes', 0)}")
     else:
-        print("\n[3/5] 代码结构分析... 跳过")
+        print("\n[3/7] 代码结构分析... 跳过")
         result['steps']['ast'] = {'status': 'skipped'}
 
     # Step 4: 依赖分析结果
     if 'dependency_analysis' in detect_result:
-        print("\n[4/5] 依赖分析...")
+        print("\n[4/7] 依赖分析...")
         deps = detect_result['dependency_analysis']
         result['steps']['dependencies'] = {
             'status': 'completed',
@@ -150,26 +246,132 @@ def cmd_init(args):
         if deps.get('conflicts', 0) > 0:
             print(f"  ⚠️ 版本冲突: {deps.get('conflicts', 0)}")
     else:
-        print("\n[4/5] 依赖分析... 跳过")
+        print("\n[4/7] 依赖分析... 跳过")
         result['steps']['dependencies'] = {'status': 'skipped'}
 
-    # Step 5: 审计日志
-    print("\n[5/5] 记录审计日志...")
+    # Step 5: 加载并渲染模板（新增）
+    print("\n[5/7] 生成项目文档...")
+    try:
+        template_engine = TemplateEngine(project_dir=str(SCRIPTS_DIR.parent))
+        template_path = get_template_for_type(project_type)
+
+        # 生成目录结构
+        directory_tree = generate_directory_tree(project_dir)
+
+        # 准备模板变量
+        modules_list = detect_result.get('modules', [])
+        # modules 可能是字符串列表或字典列表，统一处理
+        if modules_list and isinstance(modules_list[0], str):
+            modules_formatted = '\n'.join([f"| {m} | `{m}` | - |" for m in modules_list[:10]])
+        else:
+            modules_formatted = '\n'.join([f"| {m.get('name', '')} | `{m.get('path', '')}` | {m.get('description', '')} |" for m in modules_list[:10]]) if modules_list else '| - | - | - |'
+
+        config_files_list = detect_result.get('config_files', [])
+        # config_files 可能是字符串列表或字典列表，统一处理
+        if config_files_list and isinstance(config_files_list[0], str):
+            config_table = '\n'.join([f"| {c} | `{c}` | - |" for c in config_files_list[:10]])
+            config_formatted = ', '.join([f"`{c}`" for c in config_files_list[:5]])
+        else:
+            config_table = '\n'.join([f"| {c.get('key', '')} | `{c.get('file', '')}` | {c.get('description', '')} |" for c in config_files_list[:10]]) if config_files_list else '| - | - | - |'
+            config_formatted = ', '.join([f"`{c.get('file', '')}`" for c in config_files_list[:5]]) if config_files_list else '无'
+
+        deps_list = detect_result.get('dependencies', [])
+        # dependencies 可能是字符串列表或字典列表，统一处理
+        if deps_list and isinstance(deps_list[0], str):
+            deps_formatted = '\n'.join([f"| {d} | - | - |" for d in deps_list[:10]])
+        else:
+            deps_formatted = '\n'.join([f"| {d.get('name', '')} | {d.get('version', '')} | {d.get('purpose', '')} |" for d in deps_list[:10]]) if deps_list else '| - | - | - |'
+
+        template_vars = {
+            'NAME': detect_result.get('project_name', Path(project_dir).name),
+            'TYPE': project_type,
+            'LANGUAGE': detect_result.get('language', 'unknown'),
+            'FRAMEWORK': detect_result.get('framework', 'N/A'),
+            'BUILD_SYSTEM': detect_result.get('build_system', 'unknown'),
+            'TARGET_PLATFORM': detect_result.get('target_platform', 'N/A'),
+            'DIRECTORY_TREE': directory_tree,
+            'MAIN_ENTRY': detect_result.get('entry_points', ['N/A'])[0] if detect_result.get('entry_points') else 'N/A',
+            'OTHER_ENTRIES': '\n'.join([f"- `{e}`" for e in detect_result.get('entry_points', [])[1:5]]) if len(detect_result.get('entry_points', [])) > 1 else '',
+            'CORE_MODULES': modules_formatted,
+            'UTIL_MODULES': '| - | - | - |',
+            'CORE_FEATURES': '\n'.join([f"- {f}" for f in detect_result.get('features', ['待分析'])]) if detect_result.get('features') else '待分析',
+            'DEPENDENCIES': deps_formatted,
+            'INSTALL_CMD': detect_result.get('build_info', {}).get('install', '请参考项目文档') if isinstance(detect_result.get('build_info'), dict) else '请参考项目文档',
+            'BUILD_CMD': detect_result.get('build_info', {}).get('build', '请参考项目文档') if isinstance(detect_result.get('build_info'), dict) else '请参考项目文档',
+            'RUN_CMD': detect_result.get('build_info', {}).get('run', '请参考项目文档') if isinstance(detect_result.get('build_info'), dict) else '请参考项目文档',
+            'TEST_CMD': detect_result.get('build_info', {}).get('test', '请参考项目文档') if isinstance(detect_result.get('build_info'), dict) else '请参考项目文档',
+            'CONFIG_TABLE': config_table,
+            'NOTES': '请参考项目 README 或相关文档',
+            'CONFIG_FILES': config_formatted,
+            'EXTRA_FILES': '',
+            'DATE': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        }
+
+        # 渲染模板
+        project_md = template_engine.render(template_path, template_vars)
+
+        # 输出 project.md
+        output_dir = Path(project_dir) / '.projmeta'
+        output_dir.mkdir(exist_ok=True)
+        output_file = output_dir / 'project.md'
+        output_file.write_text(project_md, encoding='utf-8')
+
+        result['steps']['document'] = {
+            'status': 'completed',
+            'output_path': str(output_file),
+            'template': template_path,
+        }
+        print(f"  ✅ 已生成: {output_file}")
+
+    except Exception as e:
+        print(f"  ⚠️ 文档生成失败: {e}")
+        result['steps']['document'] = {'status': 'failed', 'error': str(e)}
+
+    # Step 6: 保存 workdir 配置（新增）
+    print("\n[6/7] 保存配置...")
+    try:
+        config_manager.set_value(str(SCRIPTS_DIR), 'workdir', project_dir)
+        result['steps']['config'] = {'status': 'completed'}
+        print(f"  ✅ 已保存 workdir = {project_dir}")
+    except Exception as e:
+        print(f"  ⚠️ 配置保存失败: {e}")
+        result['steps']['config'] = {'status': 'failed', 'error': str(e)}
+
+    # Step 7: 验证输出（新增）
+    print("\n[7/7] 验证输出...")
+    try:
+        from validate_output import OutputValidator
+        validator = OutputValidator(project_dir)
+        validate_result = validator.validate()
+        result['steps']['validation'] = {
+            'status': 'completed',
+            'valid': validate_result,
+        }
+        if validate_result:
+            print("  ✅ 输出验证通过")
+        else:
+            print("  ⚠️ 输出验证发现问题，请检查文档格式")
+    except Exception as e:
+        print(f"  ⚠️ 验证模块不可用: {e}")
+        result['steps']['validation'] = {'status': 'skipped', 'reason': str(e)}
+
+    # Step 8: 审计日志
     try:
         from security.audit_logger import AuditLogger
         logger = AuditLogger(project_dir)
         logger.log_operation('init', {
-            'project_type': detect_result.get('project_type'),
+            'project_type': project_type,
             'language': detect_result.get('language'),
             'scale': detect_result.get('scale'),
+            'files_scanned': len(detect_result.get('files', [])) if detect_result.get('files') else 0,
         })
         result['steps']['audit'] = {'status': 'completed'}
-        print("  ✅ 已记录")
     except ImportError:
         result['steps']['audit'] = {'status': 'skipped'}
-        print("  ⚠️ 审计模块不可用")
 
     print("\n✅ 初始化完成!")
+    print(f"   项目类型: {project_type}")
+    print(f"   输出文件: {output_file if 'output_file' in dir() else '未生成'}")
 
     if args.output:
         print(json.dumps(result, indent=2, ensure_ascii=False))
@@ -182,6 +384,12 @@ def cmd_scan_security(args):
     from security.sensitive_scanner import SensitiveScanner
 
     project_dir = get_project_dir(args)
+
+    # 检查目录是否存在
+    if not os.path.isdir(project_dir):
+        print(f"错误: 目录不存在: {project_dir}")
+        sys.exit(1)
+
     scanner = SensitiveScanner()
     result = scanner.scan(project_dir)
 
@@ -189,15 +397,15 @@ def cmd_scan_security(args):
         "project_dir": project_dir,
         "sensitive_files": result.sensitive_files,
         "sensitive_contents": [
-            {"file": c.file, "line": c.line, "type": c.type, "matched": c.matched}
-            for c in result.sensitive_contents[:20]
+            {"file": c.file_path, "line": c.line_number, "type": c.sensitive_type.value, "masked": c.masked}
+            for c in result.matches[:20]
         ],
         "total_files": len(result.sensitive_files),
-        "total_contents": len(result.sensitive_contents),
+        "total_contents": len(result.matches),
     }
 
-    if args.mask:
-        output["masked_files"] = result.masked_files
+    if hasattr(args, 'mask') and args.mask:
+        output["masked_files"] = result.sensitive_files
 
     print(json.dumps(output, indent=2, ensure_ascii=False))
 
@@ -418,12 +626,29 @@ def cmd_audit_log(args):
     from security.audit_logger import AuditLogger
 
     project_dir = get_project_dir(args)
+
+    # 检查目录是否存在
+    if not os.path.isdir(project_dir):
+        print(f"错误: 目录不存在: {project_dir}")
+        sys.exit(1)
+
     logger = AuditLogger(project_dir)
+    limit = getattr(args, 'limit', 20) or 20
 
-    entries = logger.get_recent_entries(args.limit or 20)
+    entries = logger.get_audit_trail(limit=limit)
 
+    if not entries:
+        print("暂无审计日志")
+        return
+
+    print(f"\n最近 {len(entries)} 条审计日志:\n")
     for entry in entries:
-        print(f"[{entry.timestamp}] {entry.operation}: {entry.details}")
+        status = "✓" if entry.success else "✗"
+        print(f"[{entry.timestamp}] [{status}] {entry.operation}")
+        if entry.details:
+            print(f"    详情: {json.dumps(entry.details, ensure_ascii=False)}")
+        if entry.error_message:
+            print(f"    错误: {entry.error_message}")
 
 
 # ============== v3.0 Commands ==============
@@ -679,11 +904,90 @@ def cmd_risk(args):
         print(json.dumps(summary, indent=2, ensure_ascii=False))
 
 
+def classify_question(question: str) -> str:
+    """自动判断问题分类"""
+    question_lower = question.lower()
+    keywords = {
+        'architecture': ['架构', '设计', '结构', 'architecture', 'design', '分层', '模块划分'],
+        'build': ['构建', '编译', '打包', 'build', 'compile', 'make', 'cmake', '安装'],
+        'feature': ['功能', '实现', '如何', '怎么', 'how', 'feature', '原理', '流程'],
+        'debug': ['错误', '异常', '调试', 'error', 'bug', 'debug', '问题', '为什么', '失败'],
+        'api': ['接口', 'API', 'api', 'endpoint', '函数', '参数', '调用'],
+        'config': ['配置', '设置', 'config', 'setting', '环境'],
+        'module': ['模块', '组件', 'component', 'module', '目录'],
+        'process': ['流程', '步骤', '过程', '启动', '初始化', 'process', 'flow'],
+    }
+
+    for category, words in keywords.items():
+        if any(w in question_lower for w in words):
+            return category
+    return 'other'
+
+
+def extract_file_refs(text: str) -> List[str]:
+    """从文本中提取文件引用"""
+    import re
+    # 匹配常见文件路径模式
+    patterns = [
+        r'[a-zA-Z0-9_/.-]+\.(py|js|ts|tsx|jsx|java|go|rs|c|cpp|h|hpp|cs|swift|kt|md|yaml|yml|json|toml)',
+        r'src/[a-zA-Z0-9_/.-]+',
+        r'lib/[a-zA-Z0-9_/.-]+',
+        r'app/[a-zA-Z0-9_/.-]+',
+        r'tests?/[a-zA-Z0-9_/.-]+',
+    ]
+
+    files = set()
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        files.update(matches)
+
+    return list(files)[:10]  # 限制最多10个
+
+
 def cmd_qa(args):
     """问答记录操作"""
     project_dir = get_project_dir(args)
 
     from qa_doc_manager import create_qa_doc, search_qa, list_qa_docs, delete_qa_doc, check_outdated
+
+    # 新增：record 子命令
+    if hasattr(args, 'record') and args.record:
+        question = args.question
+        answer = args.answer
+
+        if not question:
+            print("错误: 需要提供 --question 参数")
+            sys.exit(1)
+
+        if not answer:
+            print("错误: 需要提供 --answer 参数")
+            sys.exit(1)
+
+        # 自动判断分类
+        category = classify_question(question)
+
+        # 从答案中提取文件引用
+        file_refs = extract_file_refs(answer)
+
+        # 创建问答文档
+        result = create_qa_doc(
+            project_dir,
+            question,
+            answer,
+            file_refs=file_refs,
+            tags=args.tags.split(',') if args.tags else None
+        )
+
+        if result.get('success'):
+            print(f"✅ 问答已记录: {result.get('entry_id')}")
+            print(f"   分类: {result.get('category')}")
+            print(f"   文档: {result.get('doc_path')}")
+            if file_refs:
+                print(f"   关联文件: {', '.join(file_refs[:3])}")
+        else:
+            print(f"❌ 记录失败: {result.get('error')}")
+
+        return
 
     if args.list:
         # 列出问答
@@ -773,16 +1077,21 @@ def cmd_qa(args):
         # 显示帮助
         print("用法: qa <project_dir> [选项]")
         print("\n选项:")
-        print("  --auto              自动记录最近的问答")
-        print("  --question <问题>   指定问题")
-        print("  --answer <答案>     指定答案")
-        print("  --files <文件列表>  相关文件（逗号分隔）")
-        print("  --tags <标签列表>   标签（逗号分隔）")
-        print("  --search <关键词>   搜索问答")
-        print("  --list              列出所有问答")
-        print("  --check             检查过期问答")
-        print("  --delete <ID>       删除指定问答")
-        print("  --category <分类>   分类筛选")
+        print("  --record             直接记录问答（推荐）")
+        print("  --question <问题>    指定问题")
+        print("  --answer <答案>      指定答案")
+        print("  --tags <标签列表>    标签（逗号分隔）")
+        print("  --auto               自动记录最近的问答")
+        print("  --files <文件列表>   相关文件（逗号分隔）")
+        print("  --search <关键词>    搜索问答")
+        print("  --list               列出所有问答")
+        print("  --check              检查过期问答")
+        print("  --delete <ID>        删除指定问答")
+        print("  --category <分类>    分类筛选")
+        print("\n示例:")
+        print("  qa record --question \"登录功能怎么实现？\" --answer \"通过 AuthService 实现...\"")
+        print("  qa --search \"WiFi\"")
+        print("  qa --list --category feature")
 
 
 def save_last_qa(project_dir: str, question: str, answer: str,
@@ -967,6 +1276,7 @@ def main():
     p_security = subparsers.add_parser("scan-security", help="扫描敏感信息")
     p_security.add_argument("project_dir", nargs="?", help="项目目录")
     p_security.add_argument("--mask", action="store_true", help="输出脱敏后的内容")
+    p_security.add_argument("--json", action="store_true", help="JSON格式输出")
     p_security.set_defaults(func=cmd_scan_security)
 
     # watch 命令
@@ -1032,6 +1342,7 @@ def main():
     # qa 命令 (问答记录)
     p_qa = subparsers.add_parser("qa", help="问答记录操作")
     p_qa.add_argument("project_dir", nargs="?", help="项目目录")
+    p_qa.add_argument("--record", action="store_true", help="直接记录问答（推荐）")
     p_qa.add_argument("--auto", action="store_true", help="自动记录最近问答")
     p_qa.add_argument("--question", "-q", help="问题内容")
     p_qa.add_argument("--answer", "-a", help="答案内容")

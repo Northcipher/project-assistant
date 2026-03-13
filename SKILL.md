@@ -38,46 +38,41 @@ TRIGGER when: 用户询问项目相关问题：
 
 ## 命令索引
 
-### 配置管理
+### 项目初始化
 
-| 命令 | 说明 | 详细指南 |
-|------|------|---------|
-| `/set-config <key> <value>` | 设置配置项 | `{baseDir}/references/guides/config.md` |
-| `/get-config <key>` | 获取配置项 | - |
-| `/show-config` | 显示所有配置 | - |
-| `/delete-config <key>` | 删除配置项 | - |
+| 命令 | 说明 |
+|------|------|
+| `/init [目录]` | 初始化项目，自动生成 .projmeta/project.md |
+
+**自动完成**: 安全扫描 → 类型探测 → 模板渲染 → 文档生成 → 配置保存 → 输出验证
 
 **CLI 命令**：
 ```bash
-python3 {baseDir}/scripts/cli.py config set workdir /path/to/project
-python3 {baseDir}/scripts/cli.py config get workdir
-python3 {baseDir}/scripts/cli.py config show
-python3 {baseDir}/scripts/cli.py config delete workdir
+python3 {baseDir}/scripts/cli.py init "$PROJECT_DIR"
 ```
-
-### 项目初始化
-
-| 命令 | 说明 | 详细指南 |
-|------|------|---------|
-| `/init [目录] [选项]` | 初始化项目 | `{baseDir}/references/guides/init.md` |
 
 ### 问答文档
 
-| 命令 | 说明 | 详细指南 |
-|------|------|---------|
-| `/qa [问题] [答案]` | 记录问答（智能模式） | `{baseDir}/references/guides/qa.md` |
-| `/search-qa <关键词>` | 搜索历史问答 | - |
-| `/list-qa [分类]` | 列出问答文档 | - |
-| `/check-qa` | 检查文档过期 | - |
-| `/delete-qa <id>` | 删除问答文档 | - |
-
-**智能记录模式**：
-- 无参数调用 `/qa`：记录最近一次问答
-- 只提供问题：Claude 自动提取答案
-- 完整参数：直接创建文档
+| 命令 | 说明 |
+|------|------|
+| `/qa record --question <问题> --answer <答案>` | 记录问答（推荐） |
+| `/qa --auto` | 记录最近一次问答 |
+| `/search-qa <关键词>` | 搜索历史问答 |
+| `/list-qa [分类]` | 列出问答文档 |
+| `/check-qa` | 检查文档过期 |
+| `/delete-qa <id>` | 删除问答文档 |
 
 **CLI 命令**：
 ```bash
+# 记录问答（一条命令完成）
+python3 {baseDir}/scripts/cli.py qa --record --question "问题" --answer "答案"
+
+# 自动记录最近问答
+python3 {baseDir}/scripts/cli.py qa --auto
+
+# 搜索问答
+python3 {baseDir}/scripts/cli.py qa --search "关键词"
+
 # 列出所有问答
 python3 {baseDir}/scripts/cli.py qa --list
 
@@ -86,9 +81,23 @@ python3 {baseDir}/scripts/cli.py qa --check
 
 # 删除问答
 python3 {baseDir}/scripts/cli.py qa --delete <qa_id>
+```
 
-# 搜索问答
-python3 {baseDir}/scripts/cli.py qa --search "关键词"
+### 配置管理
+
+| 命令 | 说明 |
+|------|------|
+| `/set-config <key> <value>` | 设置配置项 |
+| `/get-config <key>` | 获取配置项 |
+| `/show-config` | 显示所有配置 |
+| `/delete-config <key>` | 删除配置项 |
+
+**CLI 命令**：
+```bash
+python3 {baseDir}/scripts/cli.py config set workdir /path/to/project
+python3 {baseDir}/scripts/cli.py config get workdir
+python3 {baseDir}/scripts/cli.py config show
+python3 {baseDir}/scripts/cli.py config delete workdir
 ```
 
 ### 飞书集成
@@ -167,70 +176,6 @@ python3 {baseDir}/scripts/cli.py cache info
 
 ---
 
-## 执行流程
-
-### Step 0: 安全检查（首次初始化时自动执行）
-
-首次 `/init` 时自动执行敏感信息扫描：
-
-```bash
-python3 {baseDir}/scripts/cli.py scan-security "$PROJECT_DIR"
-```
-
-⚠️ **安全扫描策略**：
-- **首次 `/init`**：强制执行
-- **后续分析**：可选执行
-- **发现敏感信息**：自动脱敏或警告排除
-
-### Step 1: 确定项目目录
-
-优先级：命令行参数 > 配置的 workdir > 当前目录
-
-```bash
-python3 {baseDir}/scripts/cli.py config get workdir
-```
-
-### Step 2: 检查项目文档
-
-检查 `$PROJECT_DIR/.projmeta/project.md` 是否存在，不存在则调用 `/init`。
-
-### Step 3: 搜索历史问答
-
-```bash
-python3 {baseDir}/scripts/cli.py search-qa "$QUERY"
-```
-
-**语义增强**：使用 BM25 + 中文分词，提升匹配准确率
-
-### Step 4: 分析并回答
-
-根据问题意图选择回答策略：
-
-| 意图 | 关键词 | 格式 |
-|------|--------|------|
-| LOCATION | 在哪、哪个文件 | 简洁路径 |
-| EXPLAIN | 怎么实现、原理 | Markdown详情 |
-| MODIFY | 如何修改 | 步骤指导 |
-| IMPACT | 影响什么 | 影响树 |
-
-### Step 5: 自动记录问答
-
-**自动判断标准**：满足以下任一条件即自动记录
-
-| 条件 | 示例 |
-|------|------|
-| 回答涉及代码文件 | "这个功能在 src/auth.py 实现" |
-| 回答包含流程步骤 | "构建步骤：1. xxx 2. xxx" |
-| 回答涉及架构设计 | "系统采用分层架构..." |
-| 问题包含"怎么""如何""为什么" | "怎么实现登录？" |
-
-**自动执行**：
-```bash
-python3 {baseDir}/scripts/cli.py qa --auto
-```
-
----
-
 ## 内部优化（透明执行）
 
 以下步骤由系统自动完成，用户无需关心：
@@ -258,9 +203,9 @@ python3 {baseDir}/scripts/cli.py kg related --file "$FILE"
 
 ---
 
-## ⚠️ 输出检查清单（MUST VERIFY）
+## 输出验证（自动执行）
 
-初始化完成后，**必须**验证以下内容：
+`/init` 命令会自动验证输出：
 
 ```
 □ 输出路径正确：$PROJECT_DIR/.projmeta/project.md
@@ -270,10 +215,9 @@ python3 {baseDir}/scripts/cli.py kg related --file "$FILE"
 □ 包含：入口点
 □ 包含：构建指南
 □ 包含：配置文件
-□ 格式符合模板：references/templates/project-template.md
 ```
 
-**验证命令**：
+**手动验证命令**：
 ```bash
 python3 {baseDir}/scripts/validate_output.py "$PROJECT_DIR"
 ```

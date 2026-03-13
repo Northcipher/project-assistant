@@ -4,29 +4,47 @@
 
 | 命令 | 说明 |
 |------|------|
+| `/qa record --question <问题> --answer <答案>` | 记录问答（推荐） |
+| `/qa --auto` | 记录最近一次问答 |
 | `/search-qa <关键词>` | 搜索历史问答 |
 | `/list-qa [分类]` | 列出问答文档 |
 | `/check-qa` | 检查文档是否过期 |
 | `/delete-qa <id>` | 删除问答文档 |
 
-## 执行命令
+## CLI 命令
 
 ```bash
-python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" <command> [args]
+# 记录问答（推荐）
+python3 {baseDir}/scripts/cli.py qa --record --question "问题" --answer "答案"
+
+# 自动记录最近问答
+python3 {baseDir}/scripts/cli.py qa --auto
+
+# 搜索问答
+python3 {baseDir}/scripts/cli.py qa --search "关键词"
+
+# 列出问答
+python3 {baseDir}/scripts/cli.py qa --list --category feature
+
+# 检查过期
+python3 {baseDir}/scripts/cli.py qa --check
+
+# 删除问答
+python3 {baseDir}/scripts/cli.py qa --delete <id>
 ```
 
 ## 文档分类
 
-| 分类 | 说明 |
-|------|------|
-| `architecture` | 架构设计 |
-| `build` | 构建配置 |
-| `feature` | 功能实现 |
-| `debug` | 问题调试 |
-| `api` | 接口说明 |
-| `module` | 模块说明 |
-| `process` | 流程说明 |
-| `other` | 其他 |
+| 分类 | 说明 | 关键词 |
+|------|------|--------|
+| `architecture` | 架构设计 | 架构、设计、结构、分层 |
+| `build` | 构建配置 | 编译、构建、make、cmake |
+| `feature` | 功能实现 | 怎么实现、如何、功能、原理 |
+| `debug` | 问题调试 | 报错、错误、调试、为什么 |
+| `api` | 接口说明 | 接口、API、函数、参数 |
+| `module` | 模块说明 | 模块、组件、目录 |
+| `process` | 流程说明 | 流程、步骤、启动、初始化 |
+| `other` | 其他 | - |
 
 ## 文档结构
 
@@ -53,12 +71,15 @@ python3 {baseDir}/scripts/qa_doc_manager.py "$PROJECT_DIR" <command> [args]
 ## 示例
 
 ```bash
+# 记录问答
+python3 {baseDir}/scripts/cli.py qa --record --question "登录功能怎么实现？" --answer "通过 AuthService 实现..."
+
 # 搜索 WiFi 相关问答
-/search-qa WiFi
+python3 {baseDir}/scripts/cli.py qa --search "WiFi"
 
 # 列出架构类问答
-/list-qa architecture
+python3 {baseDir}/scripts/cli.py qa --list --category architecture
 
 # 检查文档过期
-/check-qa
+python3 {baseDir}/scripts/cli.py qa --check
 ```

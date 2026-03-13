@@ -42,11 +42,71 @@ TRIGGER when: 用户询问项目相关问题：
 
 | 命令 | 说明 |
 |------|------|
-| `/init [目录]` | 初始化项目，自动生成 .projmeta/project.md |
+| `/init [目录]` | 初始化项目，生成 .projmeta/project.md |
 
-**自动完成**: 安全扫描 → 类型探测 → 模板渲染 → 文档生成 → 配置保存 → 输出验证
+**执行流程**：
 
-**CLI 命令**：
+```
+Phase 1: 数据收集 (脚本)
+    │
+    ├─ 安全扫描
+    ├─ 项目类型探测
+    ├─ 目录结构收集
+    ├─ 文件清单收集
+    └─ 输出: .projmeta/structured_data.json
+    │
+    ▼
+Phase 2: AI 分析 (Claude)
+    │
+    ├─ 确认/纠正项目类型
+    ├─ 生成模块功能描述
+    ├─ 总结核心功能
+    ├─ 推断构建命令
+    └─ 输出: AI 分析结果
+    │
+    ▼
+Phase 3: 文档生成 (脚本)
+    │
+    └─ 渲染模板 → project.md
+```
+
+**职责划分**：
+
+| 阶段 | 脚本负责 | AI 负责 |
+|------|----------|---------|
+| 数据收集 | 扫描目录、统计文件、探测类型 | - |
+| 内容生成 | - | 模块描述、功能总结、构建命令 |
+| 文档输出 | 合并数据、渲染模板 | - |
+
+**Step 1: 收集数据**
+
+```bash
+python3 {baseDir}/scripts/collector.py "$PROJECT_DIR" --output .projmeta/structured_data.json
+```
+
+**Step 2: 读取数据并分析**
+
+读取 `.projmeta/structured_data.json`，获取：
+- 项目类型、语言、构建系统
+- 目录结构、模块列表
+- 入口文件、配置文件
+- 子项目列表 (如果是 Repo 项目)
+
+**Step 3: AI 分析生成**
+
+基于结构化数据，AI 生成：
+1. **项目类型确认**: 如果脚本是 unknown，根据目录结构判断
+2. **模块功能描述**: 为每个模块生成简短描述
+3. **核心功能**: 3-5 个核心功能点
+4. **构建命令**: install/build/run/test 命令
+5. **技术栈**: 使用的技术和框架
+6. **注意事项**: 重要提醒
+
+**Step 4: 生成文档**
+
+将脚本数据 + AI 分析结果合并，生成最终文档。
+
+**CLI 快捷命令**：
 ```bash
 python3 {baseDir}/scripts/cli.py init "$PROJECT_DIR"
 ```
@@ -300,6 +360,7 @@ python3 {baseDir}/scripts/cli.py audit-log "$PROJECT_DIR" --limit 20
 
 | 分类 | 类型 |
 |------|------|
+| **Repo 多仓库** | AOSP、Android 厂商 SDK、芯片 SDK (BK7258 等)、FreeRTOS SDK、RT-Thread SDK |
 | 嵌入式MCU | STM32, ESP32, Arduino, Pico, Keil, IAR, PlatformIO |
 | 嵌入式RTOS | FreeRTOS, Zephyr, RT-Thread |
 | 嵌入式Linux | Yocto, Buildroot, OpenWrt, QNX |
@@ -320,6 +381,8 @@ python3 {baseDir}/scripts/cli.py audit-log "$PROJECT_DIR" --limit 20
 project-assistant/
 ├── SKILL.md                    # 主入口（本文件）
 ├── scripts/                    # Python 工具脚本
+│   ├── cli.py                  # 统一命令入口
+│   ├── collector.py            # 数据收集器（脚本职责）
 │   ├── config_manager.py       # 配置管理器
 │   ├── qa_doc_manager.py       # 问答文档管理器
 │   ├── feishu_doc_manager.py   # 飞书文档管理器

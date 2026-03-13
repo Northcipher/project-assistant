@@ -80,7 +80,26 @@ class ProjectDetector:
 
     # 项目类型识别规则
     RULES = [
-        # Android (高优先级)
+        # ==================== Repo 多仓库项目 (最高优先级) ====================
+        # AOSP / Android 厂商 SDK
+        ProjectTypeRule(['.repo/manifest.xml', 'device/'], 'aosp', 'java', 200, 'soong'),
+        ProjectTypeRule(['.repo/manifest.xml', 'vendor/'], 'android-vendor-sdk', 'c', 200, 'make'),
+        ProjectTypeRule(['.repo/manifest.xml', 'frameworks/'], 'aosp', 'java', 200, 'soong'),
+
+        # 芯片 SDK (BK7258, ESP32, 全志, 瑞芯微等)
+        ProjectTypeRule(['.repo/manifest.xml', 'project/'], 'chip-sdk', 'c', 195, 'make'),
+        ProjectTypeRule(['.repo/manifest.xml', 'sdk/'], 'chip-sdk', 'c', 195, 'make'),
+        ProjectTypeRule(['.repo/manifest.xml', 'bsp/'], 'chip-sdk', 'c', 195, 'make'),
+
+        # RTOS 项目
+        ProjectTypeRule(['.repo/manifest.xml', 'freertos'], 'freertos-sdk', 'c', 190, 'make'),
+        ProjectTypeRule(['.repo/manifest.xml', 'rt-thread'], 'rtthread-sdk', 'c', 190, 'scons'),
+        ProjectTypeRule(['.repo/manifest.xml', 'zephyr'], 'zephyr-sdk', 'c', 190, 'cmake'),
+
+        # 通用 Repo 项目
+        ProjectTypeRule(['.repo/manifest.xml'], 'repo-mono', 'multi', 180, 'repo'),
+
+        # ==================== Android ====================
         ProjectTypeRule(['AndroidManifest.xml'], 'android-app', 'kotlin', 100, 'gradle'),
         ProjectTypeRule(['build.gradle', 'app/src/main'], 'android-app', 'kotlin', 90, 'gradle'),
         ProjectTypeRule(['build.gradle.kts', 'app/src/main'], 'android-app', 'kotlin', 90, 'gradle'),
